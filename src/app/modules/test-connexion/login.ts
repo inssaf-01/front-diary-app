@@ -8,7 +8,7 @@ import { AppButtonComponent } from '../../shared/ui-components/app-button/app-bu
 
 import { AppInputTextComponent } from '../../shared/ui-components/app-input-text/app-input-text';
 
-import { LoginService } from './services/login';
+import { LoginService } from './login.service';
 import { finalize } from 'rxjs';
 
 export interface LoginPayload {
@@ -81,7 +81,28 @@ export class LoginComponent {
       )
       .subscribe({
         next: (response) => {
-          console.log('Connexion réussie :', response.user);
+          console.log('========== [LOGIN COMPONENT] SUCCESS ==========');
+
+          console.log('[LOGIN COMPONENT] accessToken reçu :', response.accessToken ? 'OUI' : 'NON');
+
+          console.log(
+            '[LOGIN COMPONENT] sessionStorage token :',
+            sessionStorage.getItem('accessToken') ? 'PRÉSENT' : 'ABSENT',
+          );
+
+          console.log(
+            '[LOGIN COMPONENT] localStorage token :',
+            localStorage.getItem('accessToken') ? 'PRÉSENT' : 'ABSENT',
+          );
+
+          console.log(
+            '[LOGIN COMPONENT] currentUser session :',
+            sessionStorage.getItem('currentUser'),
+          );
+
+          console.log('[LOGIN COMPONENT] currentUser local :', localStorage.getItem('currentUser'));
+
+          console.log('========== [LOGIN COMPONENT] NAVIGATE ==========');
 
           void this.router.navigate(['/home']);
         },

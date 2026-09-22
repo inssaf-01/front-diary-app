@@ -1,15 +1,19 @@
 import {
+  afterNextRender,
+  Injector,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
   DestroyRef,
-  afterNextRender,
   inject,
+  OnInit,
+  PLATFORM_ID,
 } from '@angular/core';
+import { AjoutTacheComponent, CreateTaskPayload } from '../calendrier/ajout-tache/ajout-tache';
 
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-
+import { isPlatformBrowser } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import {
@@ -18,7 +22,8 @@ import {
   TacheResponse,
 } from '../calendrier/home-calendar.service';
 
-import { AuthenticatedUser, LoginService } from '../test-connexion/services/login';
+import { AuthenticatedUser, LoginService } from '../test-connexion/login.service';
+import { defer, finalize, first, map } from 'rxjs';
 
 export type EventTone = 'mint' | 'blue' | 'orange' | 'purple' | 'pink';
 
@@ -37,6 +42,7 @@ export interface WeekDay {
 
 export interface TimelineEvent {
   id: string;
+  statusCode: string;
   time: string;
   title: string;
   subtitle: string;
@@ -101,19 +107,35 @@ const PRIORITY_ORDER: Record<string, number> = {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterLink, RouterLinkActive, AjoutTacheComponent],
   templateUrl: './home.html',
   styleUrl: './home.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly calendarService = inject(HomeCalendarService);
   private readonly loginService = inject(LoginService);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly injector = inject(Injector);
 
-  private readonly maxEvents = 7;
+  private readonly maxEvents = 6;
+  private readonly maxDays = 3;
+  private calendarTasks: TacheResponse[] = [];
+  private calendarTypes: ParametreResponse[] = [];
+  pendingStatuses = new Map<string, string>();
+  statusesSaving = false;
+  statusMessage = '';
+  statusSaveError = false;
+
+  readonly statusOptions = [
+    { code: 'A_FAIRE', label: 'À faire' },
+    { code: 'EN_COURS', label: 'En cours' },
+    { code: 'TERMINEE', label: 'Terminée' },
+    { code: 'ANNULEE', label: 'Annulée' },
+  ];
 
   currentUser: AuthenticatedUser | null = null;
 
@@ -164,7 +186,29 @@ export class HomeComponent {
       route: '/notes',
     },
   ];
+  taskDialogVisible = false;
+  savingTask = false;
 
+  openTaskDialog(): void {
+    this.taskDialogVisible = true;
+  }
+
+  closeTaskDialog(): void {
+    this.taskDialogVisible = false;
+  }
+
+  createTask(task: CreateTaskPayload): void {
+    this.savingTask = true;
+
+    console.log('Tâche à enregistrer :', task);
+
+    // Appeler ici le service backend.
+    // Exemple provisoire :
+    setTimeout(() => {
+      this.savingTask = false;
+      this.taskDialogVisible = false;
+    }, 800);
+  }
   week: WeekDay[] = [];
 
   groups: TimelineGroup[] = [];
@@ -201,61 +245,154 @@ export class HomeComponent {
     date: 'Hier, 22:14',
     text: '« Se sentir bien aujourd’hui,\n' + 'c’est construire un meilleur demain. »',
   };
+  ngOnInit(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
 
-  constructor() {
-    afterNextRender(() => {
-      if (!this.loginService.getAccessToken()) {
-        this.calendarLoading = false;
-        void this.router.navigateByUrl('/login');
-        this.changeDetectorRef.markForCheck();
-        return;
-      }
-      this.currentUser = this.loginService.getCurrentUser();
-      this.user = { ...this.user,
-        firstName: this.currentUser?.username ?? this.user.firstName,
-        fullName: this.currentUser?.username ?? this.user.fullName };
-      this.week = this.buildCurrentWeek();
-      this.loadCalendar();
-      this.changeDetectorRef.markForCheck();
-    });
+    afterNextRender(
+      () => {
+        this.currentUser = this.loginService.getCurrentUser();
+        this.user = {
+          ...this.user,
+          firstName: this.currentUser?.username ?? this.user.firstName,
+          fullName: this.currentUser?.username ?? this.user.fullName,
+        };
+        this.week = this.buildCurrentWeek();
+        this.loadCalendar();
+      },
+      { injector: this.injector },
+    );
   }
 
   private loadCalendar(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
     this.calendarLoading = true;
     this.calendarError = false;
-
+    this.changeDetectorRef.markForCheck();
     const dateDebut = this.startOfDay(new Date());
+    const dateFin = this.addDays(dateDebut, 14);
 
-    /*
-     * La période de consultation reste de 7 jours.
-     * Seul l'affichage Home est limité à 6 tâches.
-     */
-    const dateFin = this.addDays(dateDebut, 7);
-
-    this.calendarService
-      .loadCalendar(dateDebut, dateFin)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: ({ typesTache, taches }) => {
-          this.groups = this.buildTimelineGroups(taches.filter(tache => {
+    defer(() => this.calendarService.loadCalendar(dateDebut, dateFin))
+      .pipe(
+        first(),
+        map(({ typesTache, taches }) => {
+          const tasks = taches.filter((tache) => {
             const start = new Date(tache.dateDebut).getTime();
             return start >= dateDebut.getTime() && start < dateFin.getTime();
-          }), typesTache);
-
+          });
+          return { typesTache, tasks, groups: this.buildTimelineGroups(tasks, typesTache) };
+        }),
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
           this.calendarLoading = false;
-          this.calendarError = false;
-
-          this.changeDetectorRef.markForCheck();
+          if (!this.destroyRef.destroyed) this.changeDetectorRef.markForCheck();
+        }),
+      )
+      .subscribe({
+        next: ({ typesTache, tasks, groups }) => {
+          this.calendarTypes = typesTache;
+          this.calendarTasks = tasks;
+          this.groups = groups;
         },
-
-        error: (error: unknown) => {
-          console.error('Erreur lors du chargement du calendrier', error);
-
+        error: () => {
           this.groups = [];
-          this.calendarLoading = false;
           this.calendarError = true;
+        },
+      });
+  }
 
-          this.changeDetectorRef.markForCheck();
+  toggleTaskStatus(event: TimelineEvent): void {
+    if (this.statusesSaving) return;
+
+    const originalStatus = this.calendarTasks.find((task) => task.id === event.id)?.statut.code;
+    if (!originalStatus) return;
+    this.setPendingStatus(event, this.pendingStatuses.has(event.id) ? originalStatus : 'TERMINEE');
+  }
+
+  changeTaskStatus(event: TimelineEvent, statusEvent: Event): void {
+    const select = statusEvent.target as HTMLSelectElement;
+    this.setPendingStatus(event, select.value);
+  }
+
+  private setPendingStatus(event: TimelineEvent, statusCode: string): void {
+    if (this.statusesSaving) return;
+
+    const pending = new Map(this.pendingStatuses);
+
+    const savedTask = this.calendarTasks.find((task) => task.id === event.id);
+    if (!savedTask) return;
+    const originalStatus = savedTask.statut.code.toUpperCase();
+    const newStatus = statusCode.trim().toUpperCase();
+    if (!this.statusOptions.some((status) => status.code === newStatus)) return;
+
+    if (newStatus === originalStatus) {
+      pending.delete(event.id);
+    } else {
+      pending.set(event.id, newStatus);
+    }
+
+    this.pendingStatuses = pending;
+    this.statusMessage = '';
+    this.statusSaveError = false;
+
+    this.changeDetectorRef.markForCheck();
+  }
+
+  cancelStatusChanges(): void {
+    if (this.statusesSaving) return;
+    this.pendingStatuses = new Map();
+    this.statusMessage = '';
+    this.statusSaveError = false;
+    this.changeDetectorRef.markForCheck();
+  }
+
+  confirmStatusChanges(): void {
+    if (this.statusesSaving || this.pendingStatuses.size === 0) return;
+    const modifications = Array.from(this.pendingStatuses, ([tacheId, statutCode]) => ({
+      tacheId,
+      statutCode,
+    }));
+    this.statusesSaving = true;
+    this.statusMessage = '';
+    this.statusSaveError = false;
+    this.changeDetectorRef.markForCheck();
+    defer(() => this.calendarService.updateStatuses(modifications))
+      .pipe(
+        first(),
+        map((updatedTasks) => {
+          // Validate before committing local state: a malformed response must remain retryable.
+          if (!Array.isArray(updatedTasks) || updatedTasks.length !== modifications.length) {
+            throw new Error('Invalid status update response');
+          }
+          const updatedById = new Map(updatedTasks.map((task) => [task.id, task]));
+          if (
+            updatedById.size !== modifications.length ||
+            modifications.some(
+              (change) => updatedById.get(change.tacheId)?.statut?.code !== change.statutCode,
+            )
+          ) {
+            throw new Error('Incomplete status update response');
+          }
+          const tasks = this.calendarTasks.map((task) => updatedById.get(task.id) ?? task);
+          const groups = this.buildTimelineGroups(tasks, this.calendarTypes);
+          return { tasks, groups };
+        }),
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          this.statusesSaving = false;
+          // Render the completed request immediately in this OnPush view.
+          if (!this.destroyRef.destroyed) this.changeDetectorRef.detectChanges();
+        }),
+      )
+      .subscribe({
+        next: ({ tasks, groups }) => {
+          this.calendarTasks = tasks;
+          this.groups = groups;
+          this.pendingStatuses = new Map();
+          this.statusMessage = 'Les statuts ont été mis à jour';
+        },
+        error: () => {
+          this.statusSaveError = true;
+          this.statusMessage = 'Impossible d’enregistrer les changements. Réessayez.';
         },
       });
   }
@@ -266,14 +403,10 @@ export class HomeComponent {
   ): TimelineGroup[] {
     const typeLabels = new Map<number, string>(typesTache.map((type) => [type.id, type.libelle]));
 
-    /*
-     * On supprime les tâches qui ne doivent plus apparaître
-     * dans le calendrier de la Home.
-     */
     const visibleTasks = taches.filter((tache) => {
       const statusCode = tache.statut?.code?.toUpperCase();
 
-      return statusCode !== 'TERMINEE' && statusCode !== 'ANNULEE';
+      return statusCode === 'A_FAIRE' || statusCode === 'EN_COURS';
     });
 
     /*
@@ -301,7 +434,7 @@ export class HomeComponent {
     let displayedEvents = 0;
 
     for (const dateKey of sortedDates) {
-      if (displayedEvents >= this.maxEvents) {
+      if (displayedEvents >= this.maxEvents || result.length >= this.maxDays) {
         break;
       }
 
@@ -356,6 +489,8 @@ export class HomeComponent {
 
     return {
       id: tache.id,
+
+      statusCode: tache.statut?.code?.toUpperCase() ?? 'A_FAIRE',
 
       time: tache.touteLaJournee ? 'Toute la journée' : this.formatTime(tache.dateDebut),
 
@@ -529,9 +664,5 @@ export class HomeComponent {
 
   createItem(): void {
     void this.router.navigateByUrl('/quick-add');
-  }
-
-  openEvent(event: TimelineEvent): void {
-    void this.router.navigate(['/agenda', event.id]);
   }
 }

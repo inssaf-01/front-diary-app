@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
-import { LoginService } from '../../modules/test-connexion/services/login';
+import { LoginService } from '../../modules/test-connexion/login.service';
 import { API_CONFIG } from '../config/api.config';
 import { authInterceptor } from './auth.interceptor';
 
@@ -13,10 +13,13 @@ describe('Calendar authentication', () => {
   beforeEach(() => {
     sessionStorage.clear();
     localStorage.clear();
-    TestBed.configureTestingModule({ providers: [
-      provideRouter([]), provideHttpClient(withInterceptors([authInterceptor])),
-      provideHttpClientTesting(),
-    ] });
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+      ],
+    });
     http = TestBed.inject(HttpClient);
     requests = TestBed.inject(HttpTestingController);
   });
@@ -48,7 +51,9 @@ describe('Calendar authentication', () => {
     sessionStorage.setItem('tokenExpiresAt', String(Date.now() + 60000));
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     http.get(`${API_CONFIG.baseUrl}/parametres`).subscribe({ error: () => {} });
-    requests.expectOne(`${API_CONFIG.baseUrl}/parametres`).flush(null, { status: 401, statusText: 'Unauthorized' });
+    requests
+      .expectOne(`${API_CONFIG.baseUrl}/parametres`)
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
     expect(sessionStorage.getItem('accessToken')).toBeNull();
     expect(navigate).toHaveBeenCalledWith('/login');
   });

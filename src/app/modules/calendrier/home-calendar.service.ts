@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { forkJoin, Observable } from 'rxjs';
+import { HttpClient, HttpParams, HttpContext } from '@angular/common/http';
+import { KEEP_PENDING_EDITS } from '../../core/interceptors/auth.context';
+import { catchError, forkJoin, Observable, of } from 'rxjs';
 
 import { API_CONFIG } from '../../core/config/api.config';
 
@@ -32,6 +33,11 @@ export interface TacheResponse {
   updatedAt: string;
 }
 
+export interface TaskStatusChange {
+  tacheId: string;
+  statutCode: string;
+}
+
 export interface HomeCalendarData {
   typesTache: ParametreResponse[];
   taches: TacheResponse[];
@@ -43,6 +49,14 @@ export interface HomeCalendarData {
 export class HomeCalendarService {
   private readonly http = inject(HttpClient);
 
+  updateStatuses(modifications: TaskStatusChange[]): Observable<TacheResponse[]> {
+    return this.http.patch<TacheResponse[]>(
+      `${API_CONFIG.baseUrl}/taches/statuts`,
+      { modifications },
+      { context: new HttpContext().set(KEEP_PENDING_EDITS, true) },
+    );
+  }
+
   loadCalendar(dateDebut: Date, dateFin: Date): Observable<HomeCalendarData> {
     const calendarParams = new HttpParams()
       .set('dateDebut', dateDebut.toISOString())
@@ -51,9 +65,11 @@ export class HomeCalendarService {
     const typeParams = new HttpParams().set('categorie', 'TYPE_TACHE');
 
     return forkJoin({
-      typesTache: this.http.get<ParametreResponse[]>(`${API_CONFIG.baseUrl}/parametres`, {
-        params: typeParams,
-      }),
+      typesTache: this.http
+        .get<ParametreResponse[]>(`${API_CONFIG.baseUrl}/parametres`, {
+          params: typeParams,
+        })
+        .pipe(catchError(() => of([]))),
 
       taches: this.http.get<TacheResponse[]>(`${API_CONFIG.baseUrl}/taches/calendrier`, {
         params: calendarParams,

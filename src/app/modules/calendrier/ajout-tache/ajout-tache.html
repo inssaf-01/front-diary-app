@@ -1,0 +1,310 @@
+@if (visible) {
+  <div class="task-overlay" role="presentation" (click)="close()">
+    <section
+      class="creator"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="task-dialog-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="creator__orbit creator__orbit--one" aria-hidden="true"></div>
+      <div class="creator__orbit creator__orbit--two" aria-hidden="true"></div>
+      <span class="orbit-node orbit-node--one" aria-hidden="true"></span>
+      <span class="orbit-node orbit-node--two" aria-hidden="true"></span>
+      <span class="orbit-node orbit-node--three" aria-hidden="true"></span>
+      <span class="creator__planet" aria-hidden="true"></span>
+
+      <header class="creator__header">
+        <div class="title-mark" aria-hidden="true">
+          <i class="pi pi-sparkles"></i>
+          <span></span>
+        </div>
+        <div>
+          <h2 id="task-dialog-title">Ajouter une tâche</h2>
+          <p>Un petit pas de plus vers vos grands objectifs.</p>
+        </div>
+        <button class="icon-button" type="button" aria-label="Fermer" (click)="close()">
+          <i class="pi pi-times"></i>
+        </button>
+      </header>
+
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <div class="steps">
+          <article
+            class="step-card step-card--what"
+            [class.step-card--mobile-open]="mobileStep === 1"
+          >
+            <button class="step-card__mobile-head" type="button" (click)="setMobileStep(1)">
+              <span class="step-number">1</span>
+              <span><strong>Quoi ?</strong><small>Décrivez votre tâche</small></span>
+              <i
+                class="pi"
+                [class.pi-chevron-up]="mobileStep === 1"
+                [class.pi-chevron-down]="mobileStep !== 1"
+              ></i>
+            </button>
+
+            <div class="step-card__desktop-head">
+              <span class="step-number">1</span>
+              <span class="step-icon"><i class="pi pi-clipboard"></i></span>
+              <div>
+                <h3>Quoi ?</h3>
+                <p>Décrivez votre tâche</p>
+              </div>
+            </div>
+
+            <div class="step-card__content">
+              <div class="field select-field">
+                <label>Type</label>
+                <button class="select-trigger" type="button" (click)="toggleSelect('type', $event)">
+                  @if (selectedType; as option) {
+                    <span class="option-icon" [style.--option-color]="option.color"
+                      ><i [class]="option.icon"></i
+                    ></span>
+                    <span>{{ option.libelle }}</span>
+                  }
+                  <i class="pi pi-chevron-down select-arrow"></i>
+                </button>
+                @if (openSelect === 'type') {
+                  <div class="select-menu">
+                    @for (option of types; track option.id) {
+                      <button
+                        type="button"
+                        class="select-option"
+                        [class.is-selected]="option.id === form.controls.typeId.value"
+                        (click)="selectOption('typeId', option, $event)"
+                      >
+                        <span class="option-icon" [style.--option-color]="option.color"
+                          ><i [class]="option.icon"></i
+                        ></span>
+                        <span>{{ option.libelle }}</span>
+                        @if (option.id === form.controls.typeId.value) {
+                          <i class="pi pi-check option-check"></i>
+                        }
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+
+              <div class="field">
+                <label for="task-title">Titre <b>*</b></label>
+                <input
+                  id="task-title"
+                  type="text"
+                  formControlName="titre"
+                  maxlength="100"
+                  placeholder="Ex. : Préparer la présentation"
+                />
+                @if (form.controls.titre.touched && form.controls.titre.invalid) {
+                  <small class="field-error">Le titre est obligatoire.</small>
+                }
+              </div>
+
+              <div class="field field--description">
+                <label for="task-description">Description</label>
+                <textarea
+                  id="task-description"
+                  formControlName="description"
+                  rows="5"
+                  maxlength="500"
+                  placeholder="Ajoutez des détails, un contexte ou des notes..."
+                ></textarea>
+                <span class="counter">{{ descriptionLength }}/500</span>
+              </div>
+            </div>
+          </article>
+
+          <article
+            class="step-card step-card--when"
+            [class.step-card--mobile-open]="mobileStep === 2"
+          >
+            <button class="step-card__mobile-head" type="button" (click)="setMobileStep(2)">
+              <span class="step-number">2</span>
+              <span
+                ><strong>Quand ?</strong
+                ><small
+                  >{{ form.controls.dateDebut.value }} · {{ form.controls.heureDebut.value }}</small
+                ></span
+              >
+              <i
+                class="pi"
+                [class.pi-chevron-up]="mobileStep === 2"
+                [class.pi-chevron-down]="mobileStep !== 2"
+              ></i>
+            </button>
+
+            <div class="step-card__desktop-head">
+              <span class="step-number">2</span>
+              <span class="step-icon"><i class="pi pi-calendar"></i></span>
+              <div>
+                <h3>Quand ?</h3>
+                <p>Définissez la période</p>
+              </div>
+            </div>
+
+            <div class="step-card__content">
+              <label class="switch-row">
+                <span>Toute la journée</span>
+                <input type="checkbox" formControlName="touteLaJournee" />
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+
+              <div class="field">
+                <label for="start-date">Date de début <b>*</b></label>
+                <span class="input-with-icon"
+                  ><i class="pi pi-calendar"></i
+                  ><input id="start-date" type="date" formControlName="dateDebut"
+                /></span>
+              </div>
+              @if (!form.controls.touteLaJournee.value) {
+                <div class="field">
+                  <label for="start-time">Heure de début</label>
+                  <span class="input-with-icon"
+                    ><i class="pi pi-clock"></i
+                    ><input id="start-time" type="time" formControlName="heureDebut"
+                  /></span>
+                </div>
+              }
+              <div class="field">
+                <label for="end-date">Date de fin</label>
+                <span class="input-with-icon"
+                  ><i class="pi pi-calendar"></i
+                  ><input id="end-date" type="date" formControlName="dateFin"
+                /></span>
+              </div>
+              @if (!form.controls.touteLaJournee.value) {
+                <div class="field">
+                  <label for="end-time">Heure de fin</label>
+                  <span class="input-with-icon"
+                    ><i class="pi pi-clock"></i
+                    ><input id="end-time" type="time" formControlName="heureFin"
+                  /></span>
+                </div>
+              }
+            </div>
+          </article>
+
+          <article
+            class="step-card step-card--organisation"
+            [class.step-card--mobile-open]="mobileStep === 3"
+          >
+            <button class="step-card__mobile-head" type="button" (click)="setMobileStep(3)">
+              <span class="step-number">3</span>
+              <span
+                ><strong>Organisation</strong
+                ><small
+                  >{{ selectedStatut?.libelle }} · {{ selectedPriorite?.libelle }}</small
+                ></span
+              >
+              <i
+                class="pi"
+                [class.pi-chevron-up]="mobileStep === 3"
+                [class.pi-chevron-down]="mobileStep !== 3"
+              ></i>
+            </button>
+
+            <div class="step-card__desktop-head">
+              <span class="step-number">3</span>
+              <span class="step-icon"><i class="pi pi-cog"></i></span>
+              <div>
+                <h3>Organisation</h3>
+                <p>Classez et priorisez</p>
+              </div>
+            </div>
+
+            <div class="step-card__content">
+              <div class="field select-field">
+                <label>Statut</label>
+                <button
+                  class="select-trigger"
+                  type="button"
+                  (click)="toggleSelect('statut', $event)"
+                >
+                  @if (selectedStatut; as option) {
+                    <span class="option-icon" [style.--option-color]="option.color"
+                      ><i [class]="option.icon"></i></span
+                    ><span>{{ option.libelle }}</span>
+                  }
+                  <i class="pi pi-chevron-down select-arrow"></i>
+                </button>
+                @if (openSelect === 'statut') {
+                  <div class="select-menu">
+                    @for (option of statuts; track option.id) {
+                      <button
+                        type="button"
+                        class="select-option"
+                        [class.is-selected]="option.id === form.controls.statutId.value"
+                        (click)="selectOption('statutId', option, $event)"
+                      >
+                        <span class="option-icon" [style.--option-color]="option.color"
+                          ><i [class]="option.icon"></i></span
+                        ><span>{{ option.libelle }}</span>
+                        @if (option.id === form.controls.statutId.value) {
+                          <i class="pi pi-check option-check"></i>
+                        }
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+
+              <div class="field select-field">
+                <label>Priorité</label>
+                <button
+                  class="select-trigger select-trigger--priority"
+                  type="button"
+                  [style.--selected-color]="selectedPriorite?.color"
+                  (click)="toggleSelect('priorite', $event)"
+                >
+                  @if (selectedPriorite; as option) {
+                    <span class="option-icon" [style.--option-color]="option.color"
+                      ><i [class]="option.icon"></i></span
+                    ><span>{{ option.libelle }}</span>
+                  }
+                  <i class="pi pi-chevron-up select-arrow"></i>
+                </button>
+                @if (openSelect === 'priorite') {
+                  <div class="select-menu select-menu--priority">
+                    @for (option of priorites; track option.id) {
+                      <button
+                        type="button"
+                        class="select-option"
+                        [class.is-selected]="option.id === form.controls.prioriteId.value"
+                        [style.--option-color]="option.color"
+                        (click)="selectOption('prioriteId', option, $event)"
+                      >
+                        <span class="option-icon" [style.--option-color]="option.color"
+                          ><i [class]="option.icon"></i></span
+                        ><span>{{ option.libelle }}</span>
+                        @if (option.id === form.controls.prioriteId.value) {
+                          <i class="pi pi-check option-check"></i>
+                        }
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <footer class="creator__footer">
+          <p>« Les grandes réalisations commencent toujours par une simple tâche. »</p>
+          <div class="footer-actions">
+            <button class="button button--ghost" type="button" (click)="close()">Annuler</button>
+            <button class="button button--primary" type="submit" [disabled]="saving">
+              <i
+                class="pi"
+                [class.pi-plus]="!saving"
+                [class.pi-spin]="saving"
+                [class.pi-spinner]="saving"
+              ></i>
+              {{ saving ? 'Ajout en cours…' : 'Ajouter la tâche' }}
+            </button>
+          </div>
+        </footer>
+      </form>
+    </section>
+  </div>
+}
