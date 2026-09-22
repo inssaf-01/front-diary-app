@@ -1,0 +1,206 @@
+<main class="home-page">
+  <div class="night-art" aria-hidden="true">
+    <div class="stars stars--one"></div>
+    <div class="stars stars--two"></div>
+    <i class="pi pi-star-fill sparkle" style="top: 8%; left: 42%; font-size: 10px"></i>
+    <i class="pi pi-star-fill sparkle" style="top: 14%; right: 9%; font-size: 16px"></i>
+    <div class="moon"></div>
+    <div class="cityscape">
+      <div class="cityscape__horizon"></div>
+      <div class="cityscape__hills"></div>
+      <div class="cityscape__city"></div>
+      <div class="cityscape__lake"></div>
+    </div>
+    <div class="orbit orbit--one"></div>
+    <div class="orbit orbit--two"></div>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" routerLink="/home" aria-label="Équilibre, accueil">
+      <span class="brand__moon"><i class="pi pi-sparkles"></i></span>
+      <span>Équilibre</span>
+    </a>
+
+    <nav class="main-nav" aria-label="Navigation principale">
+      @for (item of navigation; track item.route) {
+        <a
+          [routerLink]="item.route"
+          routerLinkActive="is-active"
+          [routerLinkActiveOptions]="{ exact: item.route === '/home' }"
+        >
+          <i class="pi" [class]="'pi ' + item.icon"></i><span>{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+
+    <div class="topbar__actions">
+      <button class="add-button" type="button" (click)="createItem()">
+        <i class="pi pi-plus"></i><span>Ajouter</span><i class="pi pi-angle-down"></i>
+      </button>
+      <span class="topbar__separator"></span>
+      <button class="profile" type="button" (click)="navigate('/profile')">
+        <img [src]="user.avatarUrl" [alt]="user.fullName" />
+        <span class="profile__copy"
+          ><strong>Bonjour {{ user.firstName }}</strong
+          ><small>{{ user.status }}</small></span
+        >
+        <i class="pi pi-angle-down"></i>
+      </button>
+    </div>
+  </header>
+
+  <div class="page-shell">
+    <aside class="inspiration" aria-label="Citation du jour">
+      <p>Un temps<br />pour ce qui compte<br />vraiment.</p>
+      <span></span>
+    </aside>
+
+    <section class="dashboard">
+      <header class="welcome-row">
+        <div>
+          <h1>Bonjour {{ user.firstName }}</h1>
+          <p>Aujourd’hui est une belle occasion d’avancer vers vos rêves.</p>
+        </div>
+
+        <div class="week-picker" aria-label="Semaine du 14 avril">
+          @for (day of week; track day.day) {
+            <button type="button" [class.is-active]="day.active">
+              <span>{{ day.shortName }}</span
+              ><strong>{{ day.day }}</strong>
+            </button>
+          }
+        </div>
+
+        <blockquote>« Plus d’équilibre,<br />une vie plus libre. »</blockquote>
+      </header>
+
+      <div class="content-grid">
+        <section
+          class="timeline"
+          [class.timeline--many-days]="groups.length > 3"
+          aria-label="Agenda à venir"
+        >
+          @for (group of groups; track group.key) {
+            <section
+              class="timeline-group"
+              [class.timeline-group--today]="group.key === 'today'"
+              [style.--event-count]="group.events.length"
+            >
+              <header class="group-heading">
+                <span class="heading-dot"></span>
+                <h2>{{ group.label }}</h2>
+                <p>{{ group.dateLabel }}</p>
+              </header>
+
+              <div class="events">
+                @for (event of group.events; track event.id) {
+                  <article class="event-row" [class.event-row--now]="event.title === 'Maintenant'">
+                    <time>{{ event.time }}</time>
+                    <span class="event-node" [attr.data-tone]="event.tone">
+                      @if (event.title === 'Maintenant') {
+                        <span class="now-ring"></span>
+                      } @else {
+                        <i class="pi" [class]="'pi ' + event.icon"></i>
+                      }
+                    </span>
+                    <button class="event-card" type="button" (click)="openEvent(event)">
+                      @if (event.title !== 'Maintenant') {
+                        <span class="event-icon" [attr.data-tone]="event.tone"
+                          ><i class="pi" [class]="'pi ' + event.icon"></i
+                        ></span>
+                      }
+                      <span class="event-copy">
+                        <strong>{{ event.title }}</strong>
+                        <small>{{ event.subtitle }}</small>
+                      </span>
+                      <span class="event-meta">
+                        @if (event.team) {
+                          <small><i class="pi pi-users"></i>{{ event.team }}</small>
+                        }
+                        @if (event.duration) {
+                          <small><i class="pi pi-clock"></i>{{ event.duration }}</small>
+                        }
+                        @if (event.badge) {
+                          <em>{{ event.badge }}</em>
+                        }
+                      </span>
+                      <i class="pi pi-angle-right event-chevron"></i>
+                      <i class="pi pi-ellipsis-h event-more"></i>
+                    </button>
+                  </article>
+                }
+              </div>
+            </section>
+          }
+        </section>
+
+        <aside class="insights" aria-label="Aperçu personnel">
+          <button
+            class="insight-card saving-card"
+            type="button"
+            (click)="navigate('/finances/savings')"
+          >
+            <span class="insight-icon insight-icon--mint"><i class="pi pi-send"></i></span>
+            <span class="insight-copy"
+              ><strong>{{ travelSaving.title }}</strong
+              ><small>{{ travelSaving.subtitle }}</small></span
+            >
+            <b>{{ travelSaving.percent }} %</b>
+            <span class="card-picture card-picture--travel"><i class="pi pi-angle-right"></i></span>
+            <span class="progress"><span [style.width.%]="travelSaving.percent"></span></span>
+          </button>
+
+          <button class="insight-card compact-card" type="button" (click)="navigate('/stock')">
+            <span class="insight-icon insight-icon--orange"
+              ><i class="pi pi-shopping-bag"></i
+            ></span>
+            <span class="insight-copy"
+              ><strong>{{ lowStock.title }}</strong
+              ><small>{{ lowStock.subtitle }}</small></span
+            >
+            <i class="pi pi-angle-right side-chevron"></i>
+          </button>
+
+          <button
+            class="insight-card shopping-card"
+            type="button"
+            (click)="navigate('/shopping-list')"
+          >
+            <span class="insight-icon insight-icon--blue"><i class="pi pi-shopping-cart"></i></span>
+            <span class="insight-copy"
+              ><strong>{{ shopping.title }}</strong
+              ><b>{{ shopping.count }} articles</b><small>{{ shopping.subtitle }}</small></span
+            >
+            <span class="groceries" aria-hidden="true">🥬🥖🛍️</span>
+          </button>
+
+          <button class="insight-card budget-card" type="button" (click)="navigate('/finances')">
+            <span class="insight-icon insight-icon--violet"><i class="pi pi-wallet"></i></span>
+            <span class="insight-copy"
+              ><strong>{{ budget.title }}</strong
+              ><small
+                >{{ budget.used | number: '1.0-0' }} € sur
+                {{ budget.total | number: '1.0-0' }} €</small
+              ></span
+            >
+            <b>{{ budget.percent }} % <small>utilisé</small></b>
+            <i class="pi pi-angle-right side-chevron"></i>
+            <span class="progress progress--violet"
+              ><span [style.width.%]="budget.percent"></span
+            ></span>
+          </button>
+
+          <button class="insight-card note-card" type="button" (click)="navigate('/notes')">
+            <span class="insight-icon insight-icon--violet"><i class="pi pi-file"></i></span>
+            <span class="insight-copy"
+              ><strong>{{ recentNote.title }}</strong
+              ><small class="note-text">{{ recentNote.text }}</small></span
+            >
+            <time>{{ recentNote.date }}</time>
+            <i class="pi pi-angle-right side-chevron"></i>
+          </button>
+        </aside>
+      </div>
+    </section>
+  </div>
+</main>

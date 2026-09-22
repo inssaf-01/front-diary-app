@@ -1,0 +1,143 @@
+:host {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.field {
+  display: grid;
+  width: 100%;
+  gap: 9px;
+}
+
+.field label {
+  color: #ecf1ff;
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.input-shell {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.app-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 56px;
+  padding: 0 18px;
+  border: 1px solid rgba(151, 171, 221, 0.62);
+  border-radius: 15px;
+  outline: none;
+  appearance: none;
+  color: #f8fbff;
+  background: rgba(12, 24, 54, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.app-input--with-icon {
+  padding-left: 56px;
+}
+
+.app-input--with-toggle {
+  padding-right: 58px;
+}
+
+.app-input::placeholder {
+  color: #8996b8;
+  opacity: 1;
+}
+
+.app-input:hover:not(:disabled) {
+  border-color: rgba(176, 195, 241, 0.8);
+}
+
+.app-input:focus {
+  border-color: #74f5d2;
+  background: rgba(13, 27, 61, 0.96);
+  box-shadow:
+    0 0 0 3px rgba(116, 245, 210, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.input-shell--invalid .app-input {
+  border-color: #ff6688;
+}
+
+.input-shell__leading {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 16px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: #cbd6f2;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.input-shell__leading i {
+  display: block;
+  font-size: 1.08rem;
+  line-height: 1;
+}
+
+.password-toggle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: 9px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  color: #d2dcf4;
+  background: transparent;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.password-toggle i {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.password-toggle:hover,
+.password-toggle:focus-visible {
+  color: #74f5d2;
+  background: rgba(255, 255, 255, 0.07);
+  outline: none;
+}
+
+.app-input:disabled,
+.password-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.field__error {
+  color: #ff9cb1;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 480px) {
+  .app-input {
+    height: 54px;
+    font-size: 16px;
+  }
+}

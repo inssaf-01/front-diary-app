@@ -1,0 +1,31 @@
+<button
+  class="app-button"
+  [class.app-button--fluid]="fluid"
+  [class.app-button--loading]="loading"
+  [class.app-button--secondary]="severity === 'secondary'"
+  [class.app-button--success]="severity === 'success'"
+  [class.app-button--info]="severity === 'info'"
+  [class.app-button--warning]="severity === 'warning'"
+  [class.app-button--danger]="severity === 'danger'"
+  [class.app-button--contrast]="severity === 'contrast'"
+  [class.app-button--icon-right]="iconPosition === 'right'"
+  [class.app-button--icon-top]="iconPosition === 'top'"
+  [class.app-button--icon-bottom]="iconPosition === 'bottom'"
+  [type]="type"
+  [disabled]="disabled || loading"
+  [attr.aria-label]="ariaLabel || label"
+  [attr.aria-busy]="loading"
+  (click)="handleClick($event)"
+>
+  @if (loading) {
+    <i class="pi pi-spinner pi-spin app-button__icon" aria-hidden="true"></i>
+
+    <span>Connexion...</span>
+  } @else {
+    @if (icon) {
+      <i [class]="icon + ' app-button__icon'" aria-hidden="true"></i>
+    }
+
+    <span>{{ label }}</span>
+  }
+</button>

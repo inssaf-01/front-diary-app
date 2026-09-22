@@ -1,0 +1,134 @@
+<main class="login-page">
+  <div class="stars stars--one" aria-hidden="true"></div>
+  <div class="stars stars--two" aria-hidden="true"></div>
+  <div class="mountains" aria-hidden="true"></div>
+  <div class="horizon-glow" aria-hidden="true"></div>
+
+  <header class="brand" aria-label="Équilibre">
+    <span class="brand__mark" aria-hidden="true"> <span></span><span></span><span></span> </span>
+    <span class="brand__name">Équilibre</span>
+  </header>
+
+  <section class="login-layout">
+    <div class="intro">
+      <p class="intro__eyebrow">Votre espace personnel</p>
+      <h1>Votre quotidien,<br /><span>parfaitement aligné.</span></h1>
+      <p class="intro__text">Planifiez, progressez et gardez l’esprit léger.</p>
+
+      <div class="insights" aria-label="Aperçu de votre organisation">
+        <article class="insight-card">
+          <span class="insight-card__icon insight-card__icon--violet">
+            <i class="pi pi-calendar" aria-hidden="true"></i>
+          </span>
+          <div>
+            <small>Prochain événement</small>
+            <strong>Réunion équipe</strong>
+            <span>Demain à 10h00</span>
+          </div>
+        </article>
+
+        <article class="insight-card">
+          <span class="insight-card__icon insight-card__icon--green">
+            <i class="pi pi-wallet" aria-hidden="true"></i>
+          </span>
+          <div class="insight-card__content">
+            <small>Objectif épargne</small>
+            <strong>68 % atteint</strong>
+            <span class="progress" aria-label="Progression 68 %">
+              <span style="width: 68%"></span>
+            </span>
+          </div>
+        </article>
+
+        <article class="insight-card">
+          <span class="insight-card__icon insight-card__icon--mint">
+            <i class="pi pi-check" aria-hidden="true"></i>
+          </span>
+          <div>
+            <small>Tâches terminées</small>
+            <strong>12 cette semaine</strong>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <div class="orbit" aria-hidden="true">
+      <span class="orbit__planet orbit__planet--one"></span>
+      <span class="orbit__planet orbit__planet--two"></span>
+      <span class="orbit__planet orbit__planet--three"></span>
+    </div>
+
+    <section class="login-card" aria-labelledby="login-title">
+      <div class="login-card__brand">
+        <span class="brand__mark brand__mark--large" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <h2 id="login-title">Équilibre</h2>
+      </div>
+
+      @if (authenticationError) {
+        <div class="error-banner" role="alert">
+          <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+          <span>{{ authenticationError }}</span>
+        </div>
+      }
+
+      <form class="login-form" [formGroup]="loginForm" (ngSubmit)="submit()" novalidate>
+        <app-input-text
+          class="login-form__field"
+          id="identifier"
+          label="Email ou nom d’utilisateur"
+          type="email"
+          icon="pi pi-envelope"
+          placeholder="vous@exemple.com"
+          autocomplete="username"
+          formControlName="identifier"
+          [invalid]="identifierInvalid"
+          errorMessage="Saisissez une adresse e-mail valide."
+        />
+
+        <app-input-text
+          class="login-form__field"
+          id="password"
+          label="Mot de passe"
+          type="password"
+          icon="pi pi-lock"
+          placeholder="Votre mot de passe"
+          autocomplete="current-password"
+          formControlName="password"
+          [invalid]="passwordInvalid"
+          [showPasswordToggle]="true"
+          errorMessage="Le mot de passe doit contenir au moins 6 caractères."
+        />
+
+        <div class="form-options">
+          <label class="remember-option">
+            <input type="checkbox" formControlName="rememberMe" />
+
+            <span class="remember-option__box" aria-hidden="true">
+              <i class="pi pi-check"></i>
+            </span>
+
+            <span>Se souvenir de moi</span>
+          </label>
+
+          <a href="#" (click)="requestPasswordReset($event)"> Mot de passe oublié ? </a>
+        </div>
+
+        <app-button
+          class="login-submit"
+          label="Se connecter"
+          icon="pi pi-arrow-right"
+          iconPosition="right"
+          type="submit"
+          [loading]="loading"
+        />
+      </form>
+
+      <p class="security-note">
+        <i class="pi pi-shield" aria-hidden="true"></i>
+        <span>Espace personnel sécurisé</span>
+      </p>
+    </section>
+  </section>
+</main>

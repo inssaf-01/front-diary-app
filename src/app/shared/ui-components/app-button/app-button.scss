@@ -1,0 +1,42 @@
+:host {
+  display: inline-block;
+}
+
+:host:has(.app-button--fluid) {
+  display: block;
+  width: 100%;
+}
+
+.app-button.app-button {
+  display: inline-flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 14px;
+  color: #061126;
+  background: linear-gradient(90deg, #68e8ce, #a1ffe6);
+  box-shadow: 0 12px 34px rgba(83, 238, 206, 0.26);
+  font-weight: 800;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease;
+}
+
+.app-button--fluid {
+  width: 100%;
+}
+
+.app-button.app-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.04);
+  box-shadow: 0 16px 42px rgba(83, 238, 206, 0.34);
+}
+
+.app-button.app-button:disabled {
+  opacity: 0.64;
+  cursor: wait;
+}
