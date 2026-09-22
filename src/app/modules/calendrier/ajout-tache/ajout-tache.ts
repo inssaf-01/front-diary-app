@@ -71,7 +71,7 @@ export class AjoutTacheComponent {
   @Output() closed = new EventEmitter<void>();
   @Output() taskCreated = new EventEmitter<CreateTaskPayload>();
 
-  openSelect: 'type' | 'statut' | 'priorite' | null = 'priorite';
+  openSelect: 'type' | 'statut' | 'priorite' | null = null;
   mobileStep = 1;
 
   readonly form = this.fb.nonNullable.group({

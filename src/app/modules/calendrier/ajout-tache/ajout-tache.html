@@ -20,6 +20,7 @@
           <span></span>
         </div>
         <div>
+          <span class="creator__eyebrow">Un moment pour vos projets</span>
           <h2 id="task-dialog-title">Ajouter une tâche</h2>
           <p>Un petit pas de plus vers vos grands objectifs.</p>
         </div>
@@ -56,7 +57,7 @@
             <div class="step-card__content">
               <div class="field select-field">
                 <label>Type</label>
-                <button class="select-trigger" type="button" (click)="toggleSelect('type', $event)">
+                <button class="select-trigger" type="button" aria-label="Type de tâche" [attr.aria-expanded]="openSelect === 'type'" (click)="toggleSelect('type', $event)">
                   @if (selectedType; as option) {
                     <span class="option-icon" [style.--option-color]="option.color"
                       ><i [class]="option.icon"></i
@@ -220,6 +221,8 @@
                   class="select-trigger"
                   type="button"
                   (click)="toggleSelect('statut', $event)"
+                  aria-label="Statut"
+                  [attr.aria-expanded]="openSelect === 'statut'"
                 >
                   @if (selectedStatut; as option) {
                     <span class="option-icon" [style.--option-color]="option.color"
@@ -256,13 +259,15 @@
                   type="button"
                   [style.--selected-color]="selectedPriorite?.color"
                   (click)="toggleSelect('priorite', $event)"
+                  aria-label="Priorité"
+                  [attr.aria-expanded]="openSelect === 'priorite'"
                 >
                   @if (selectedPriorite; as option) {
                     <span class="option-icon" [style.--option-color]="option.color"
                       ><i [class]="option.icon"></i></span
                     ><span>{{ option.libelle }}</span>
                   }
-                  <i class="pi pi-chevron-up select-arrow"></i>
+                  <i class="pi pi-chevron-down select-arrow"></i>
                 </button>
                 @if (openSelect === 'priorite') {
                   <div class="select-menu select-menu--priority">
