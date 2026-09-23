@@ -81,6 +81,7 @@
 
       <div class="content-grid">
         <section
+          #timelineElement
           class="timeline"
           [class.timeline--many-days]="groups.length > 3"
           aria-label="Agenda à venir"
@@ -215,6 +216,14 @@
                       </div>
                     </article>
                   }
+                  @if (group.hiddenCount > 0) {
+                    <button class="more-tasks" type="button" (click)="navigate('/tasks')">
+                      <i class="pi pi-plus" aria-hidden="true"></i>
+                      {{ group.hiddenCount }} autre{{ group.hiddenCount > 1 ? 's' : '' }} tâche{{
+                        group.hiddenCount > 1 ? 's' : ''
+                      }}
+                    </button>
+                  }
                 </div>
               </section>
             }
@@ -294,6 +303,7 @@
 <app-ajout-tache
   [visible]="taskDialogVisible"
   [saving]="savingTask"
+  [saveError]="taskSaveError"
   (closed)="closeTaskDialog()"
   (taskCreated)="createTask($event)"
 />

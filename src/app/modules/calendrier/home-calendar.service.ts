@@ -1,7 +1,8 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpContext } from '@angular/common/http';
 import { KEEP_PENDING_EDITS } from '../../core/interceptors/auth.context';
-import { catchError, forkJoin, Observable, of } from 'rxjs';
+import { catchError, forkJoin, Observable, of, switchMap, tap } from 'rxjs';
+import type { CreateTaskPayload } from './ajout-tache/ajout-tache';
 
 import { API_CONFIG } from '../../core/config/api.config';
 
@@ -49,6 +50,46 @@ export interface HomeCalendarData {
 export class HomeCalendarService {
   private readonly http = inject(HttpClient);
 
+  createTask(task: CreateTaskPayload): Observable<TacheResponse> {
+    const context = new HttpContext().set(KEEP_PENDING_EDITS, true);
+    const parameters = (categorie: string) =>
+      this.http.get<ParametreResponse[]>(`${API_CONFIG.baseUrl}/parametres`, {
+        params: new HttpParams().set('categorie', categorie),
+        context,
+      });
+
+    return forkJoin({
+      types: parameters('TYPE_TACHE'),
+      statuts: parameters('STATUT_TACHE'),
+      priorites: parameters('PRIORITE_TACHE'),
+    }).pipe(
+      switchMap(({ types, statuts, priorites }) => {
+        const resolveId = (options: ParametreResponse[], code: string): number => {
+          const option = options.find((item) => item.code === code);
+          if (!option) throw new Error(`Paramètre indisponible : ${code}`);
+          return option.id;
+        };
+        const toInstant = (date: string, time: string | null): string =>
+          new Date(`${date}T${task.touteLaJournee ? '00:00' : time || '00:00'}:00`).toISOString();
+
+        return this.http.post<TacheResponse>(
+          `${API_CONFIG.baseUrl}/taches`,
+          {
+            typeTacheId: resolveId(types, task.typeId),
+            statutId: resolveId(statuts, task.statutId),
+            prioriteId: resolveId(priorites, task.prioriteId),
+            titre: task.titre,
+            details: task.description,
+            dateDebut: toInstant(task.dateDebut, task.heureDebut),
+            dateFin: toInstant(task.dateFin, task.heureFin),
+            touteLaJournee: task.touteLaJournee,
+          },
+          { context },
+        );
+      }),
+    );
+  }
+
   updateStatuses(modifications: TaskStatusChange[]): Observable<TacheResponse[]> {
     return this.http.patch<TacheResponse[]>(
       `${API_CONFIG.baseUrl}/taches/statuts`,
@@ -71,9 +112,11 @@ export class HomeCalendarService {
         })
         .pipe(catchError(() => of([]))),
 
-      taches: this.http.get<TacheResponse[]>(`${API_CONFIG.baseUrl}/taches/calendrier`, {
-        params: calendarParams,
-      }),
+      taches: this.http
+        .get<TacheResponse[]>(`${API_CONFIG.baseUrl}/taches/calendrier`, {
+          params: calendarParams,
+        })
+        .pipe(tap((taches) => console.log('[CALENDRIER] tâches reçues =', taches))),
     });
   }
 }

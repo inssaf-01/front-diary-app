@@ -295,6 +295,9 @@
         </div>
 
         <footer class="creator__footer">
+          @if (saveError) {
+            <span class="field-error" role="alert">{{ saveError }}</span>
+          }
           <p>« Les grandes réalisations commencent toujours par une simple tâche. »</p>
           <div class="footer-actions">
             <button class="button button--ghost" type="button" (click)="close()">Annuler</button>

@@ -9,6 +9,7 @@ describe('Home calendar', () => {
   // Fixtures uniquement pour les tests : ces objets ne sont jamais chargés par la Home réelle.
   let updateStatuses: ReturnType<typeof vi.fn>;
   let loadCalendar: ReturnType<typeof vi.fn>;
+  let createTask: ReturnType<typeof vi.fn>;
   const task = (
     id: string,
     day: number,
@@ -37,11 +38,12 @@ describe('Home calendar', () => {
   beforeEach(() => {
     loadCalendar = vi.fn();
     updateStatuses = vi.fn();
+    createTask = vi.fn();
     TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [
         provideRouter([]),
-        { provide: HomeCalendarService, useValue: { loadCalendar, updateStatuses } },
+        { provide: HomeCalendarService, useValue: { loadCalendar, updateStatuses, createTask } },
         {
           provide: LoginService,
           useValue: { getCurrentUser: () => null, getAccessToken: () => 'test-token' },
@@ -77,7 +79,7 @@ describe('Home calendar', () => {
     ]);
   });
 
-  it('limits to six tasks, sorting priority before time', async () => {
+  it('limits to six tasks, sorting time before priority', async () => {
     loadCalendar.mockReturnValue(
       of({
         typesTache: [],
@@ -98,9 +100,9 @@ describe('Home calendar', () => {
     const groups = fixture.componentInstance.groups;
     expect(groups.length).toBe(3);
     expect(groups.flatMap((g) => g.events.map((e) => e.id))).toEqual([
+      'normal',
       'urgent-early',
       'urgent-late',
-      'normal',
       'second',
       'third-a',
       'third-b',
@@ -122,5 +124,25 @@ describe('Home calendar', () => {
       'day-2',
     ]);
     expect(taches.length).toBe(7);
+  });
+
+  it('places a newly created 14h task between 10h and 18h regardless of priority', async () => {
+    const morning = task('10h', 0, 10, 'BASSE');
+    const evening = task('18h', 0, 18, 'URGENTE');
+    const added = task('14h', 0, 14, 'HAUTE');
+    loadCalendar.mockReturnValueOnce(of({ typesTache: [], taches: [evening, morning] }))
+      .mockReturnValueOnce(of({ typesTache: [], taches: [evening, morning, added] }));
+    createTask.mockReturnValue(of(added));
+    const fixture = TestBed.createComponent(HomeComponent);
+    await fixture.whenStable();
+    fixture.componentInstance.createTask({
+      typeId: 'COURSES', statutId: 'A_FAIRE', prioriteId: 'HAUTE',
+      titre: '14h', description: '', touteLaJournee: false,
+      dateDebut: '2026-09-23', dateFin: '2026-09-23', heureDebut: '14:00', heureFin: '15:00',
+    });
+    await fixture.whenStable();
+    expect(loadCalendar).toHaveBeenCalledTimes(2);
+    expect(fixture.componentInstance.groups[0].events.map(event => event.id))
+      .toEqual(['10h', '14h', '18h']);
   });
 });

@@ -45,6 +45,7 @@ export class AjoutTacheComponent {
 
   @Input() visible = false;
   @Input() saving = false;
+  @Input() saveError = '';
 
   @Input() types: TaskParameterOption[] = [
     { id: 'TACHE', libelle: 'Tâche', icon: 'pi pi-check-square', color: '#7193ff' },

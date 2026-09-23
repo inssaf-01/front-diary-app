@@ -33,6 +33,23 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
 
   afterEach(() => requests.verify());
 
+  it('starts calendar requests at initialization without waiting for a render or click', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+      { provide: PLATFORM_ID, useValue: 'browser' },
+      { provide: ChangeDetectorRef, useValue: { markForCheck: vi.fn(), detectChanges: vi.fn() } },
+      { provide: LoginService, useValue: { getCurrentUser: () => null } },
+    ] });
+    requests = TestBed.inject(HttpTestingController);
+    const home = TestBed.runInInjectionContext(() => new HomeComponent());
+    home.ngOnInit();
+    requests.expectOne(req => req.url.endsWith('/parametres')).flush([]);
+    requests.expectOne(req => req.url.endsWith('/taches/calendrier')).flush([task()]);
+    expect(home.calendarLoading).toBe(false);
+    expect(home.groups[0].events[0].id).toBe('task-1');
+  });
+
   async function loaded(tasks = [task()]) {
     const fixture = TestBed.createComponent(HomeComponent);
     fixture.detectChanges();
@@ -48,6 +65,68 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
     element.value = code;
     element.dispatchEvent(new Event('change', { bubbles: true }));
   }
+
+  it.each(['success', 'empty', 'error'])('renders calendar completion immediately without a click (%s)', async outcome => {
+    const fixture = TestBed.createComponent(HomeComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('Chargement de vos tâches');
+    requests.expectOne(req => req.url.endsWith('/parametres')).flush([]);
+    const calendar = requests.expectOne(req => req.url.endsWith('/taches/calendrier'));
+    if (outcome === 'error') calendar.flush(null, { status: 500, statusText: 'Error' });
+    else calendar.flush(outcome === 'empty' ? [] : [task()]);
+
+    // Inspect the DOM directly: no click, detectChanges, or scheduled render after the response.
+    expect(fixture.nativeElement.textContent).not.toContain('Chargement de vos tâches');
+    if (outcome === 'success') expect(fixture.nativeElement.querySelector('.event-row')).not.toBeNull();
+    if (outcome === 'empty') expect(fixture.nativeElement.textContent).toContain('Aucune tâche à afficher');
+    if (outcome === 'error') expect(fixture.nativeElement.textContent).toContain('Impossible de charger vos tâches');
+  });
+
+  it.each([true, false])('creates through the API and unlocks the modal (success=%s)', async success => {
+    const fixture = await loaded();
+    const home = fixture.componentInstance;
+    home.openTaskDialog();
+    const payload = {
+      typeId: 'REUNION', statutId: 'EN_COURS', prioriteId: 'URGENTE',
+      titre: 'test ajout', description: 'test ajout tache', touteLaJournee: false,
+      dateDebut: '2026-09-23', dateFin: '2026-09-23', heureDebut: '12:45', heureFin: '19:30',
+    };
+    home.createTask(payload);
+    home.createTask(payload);
+    for (const [categorie, code, id] of [
+      ['TYPE_TACHE', 'REUNION', 10], ['STATUT_TACHE', 'EN_COURS', 20],
+      ['PRIORITE_TACHE', 'URGENTE', 30],
+    ] as const) {
+      requests.expectOne(req => req.params.get('categorie') === categorie)
+        .flush([{ id, code, categorie, libelle: code, ordre: 1 }]);
+    }
+    const post = requests.expectOne(req => req.method === 'POST');
+    expect(post.request.url).toBe(`${API_CONFIG.baseUrl}/taches`);
+    expect(post.request.body).toEqual({
+      typeTacheId: 10, statutId: 20, prioriteId: 30,
+      titre: payload.titre, details: payload.description, touteLaJournee: false,
+      dateDebut: new Date('2026-09-23T12:45:00').toISOString(),
+      dateFin: new Date('2026-09-23T19:30:00').toISOString(),
+    });
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('.button--primary').disabled).toBe(true);
+    if (success) {
+      post.flush(task('EN_COURS'));
+      requests.expectOne(req => req.url.endsWith('/parametres')).flush([]);
+      requests.expectOne(req => req.url.endsWith('/taches/calendrier')).flush([task('EN_COURS')]);
+    } else {
+      post.flush(null, { status: 500, statusText: 'Error' });
+    }
+    await fixture.whenStable();
+    expect(home.savingTask).toBe(false);
+    expect(home.taskDialogVisible).toBe(!success);
+    if (success) expect(fixture.nativeElement.querySelector('.task-overlay')).toBeNull();
+    else {
+      expect(fixture.nativeElement.querySelector('.button--primary').disabled).toBe(false);
+      expect(fixture.nativeElement.querySelector('[role="alert"]').textContent).toContain('Impossible');
+    }
+  });
 
   it.each([
     ['A_FAIRE', 'EN_COURS', 1], ['EN_COURS', 'A_FAIRE', 1],

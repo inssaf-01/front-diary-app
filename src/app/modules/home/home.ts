@@ -5,9 +5,11 @@ import {
   ChangeDetectorRef,
   Component,
   DestroyRef,
+  ElementRef,
   inject,
   OnInit,
   PLATFORM_ID,
+  ViewChild,
 } from '@angular/core';
 import { AjoutTacheComponent, CreateTaskPayload } from '../calendrier/ajout-tache/ajout-tache';
 
@@ -58,6 +60,7 @@ export interface TimelineGroup {
   label: string;
   dateLabel: string;
   events: TimelineEvent[];
+  hiddenCount: number;
 }
 
 interface TypeDisplayConfig {
@@ -121,8 +124,16 @@ export class HomeComponent implements OnInit {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly injector = inject(Injector);
 
-  private readonly maxEvents = 6;
-  private readonly maxDays = 3;
+  @ViewChild('timelineElement') private timelineElement?: ElementRef<HTMLElement>;
+
+  private readonly dayHeaderHeight = 36;
+  private readonly groupInnerGap = 10;
+  private readonly groupGap = 12;
+  private readonly taskRowHeight = 58;
+  private readonly taskGap = 8;
+  private readonly moreTasksHeight = 28;
+  private timelineHeight = 0;
+  private resizeObserver?: ResizeObserver;
   private calendarTasks: TacheResponse[] = [];
   private calendarTypes: ParametreResponse[] = [];
   pendingStatuses = new Map<string, string>();
@@ -188,26 +199,42 @@ export class HomeComponent implements OnInit {
   ];
   taskDialogVisible = false;
   savingTask = false;
+  taskSaveError = '';
 
   openTaskDialog(): void {
+    this.taskSaveError = '';
     this.taskDialogVisible = true;
   }
 
   closeTaskDialog(): void {
+    if (this.savingTask) return;
     this.taskDialogVisible = false;
   }
 
   createTask(task: CreateTaskPayload): void {
+    if (this.savingTask) return;
     this.savingTask = true;
-
-    console.log('Tâche à enregistrer :', task);
-
-    // Appeler ici le service backend.
-    // Exemple provisoire :
-    setTimeout(() => {
-      this.savingTask = false;
-      this.taskDialogVisible = false;
-    }, 800);
+    this.taskSaveError = '';
+    this.changeDetectorRef.markForCheck();
+    defer(() => this.calendarService.createTask(task))
+      .pipe(
+        first(),
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          this.savingTask = false;
+          if (!this.destroyRef.destroyed) this.changeDetectorRef.markForCheck();
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.taskDialogVisible = false;
+          this.loadCalendar();
+        },
+        error: () => {
+          this.taskSaveError =
+            'Impossible d’enregistrer la tâche. Vérifiez les dates et votre connexion, puis réessayez.';
+        },
+      });
   }
   week: WeekDay[] = [];
 
@@ -248,19 +275,42 @@ export class HomeComponent implements OnInit {
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
+    this.currentUser = this.loginService.getCurrentUser();
+    this.user = {
+      ...this.user,
+      firstName: this.currentUser?.username ?? this.user.firstName,
+      fullName: this.currentUser?.username ?? this.user.fullName,
+    };
+    this.week = this.buildCurrentWeek();
+    // Start data loading independently of the first browser render.
+    this.loadCalendar();
+
     afterNextRender(
       () => {
-        this.currentUser = this.loginService.getCurrentUser();
-        this.user = {
-          ...this.user,
-          firstName: this.currentUser?.username ?? this.user.firstName,
-          fullName: this.currentUser?.username ?? this.user.fullName,
-        };
-        this.week = this.buildCurrentWeek();
-        this.loadCalendar();
+        this.observeTimelineSize();
       },
       { injector: this.injector },
     );
+  }
+
+  private observeTimelineSize(): void {
+    const timeline = this.timelineElement?.nativeElement;
+    if (!timeline || typeof ResizeObserver === 'undefined') return;
+
+    this.resizeObserver = new ResizeObserver(([entry]) => {
+      const nextHeight = Math.floor(entry.contentRect.height);
+      if (nextHeight <= 0 || Math.abs(nextHeight - this.timelineHeight) < 2) return;
+
+      this.timelineHeight = nextHeight;
+
+      if (this.calendarTasks.length > 0) {
+        this.groups = this.buildTimelineGroups(this.calendarTasks, this.calendarTypes);
+        this.changeDetectorRef.detectChanges();
+      }
+    });
+
+    this.resizeObserver.observe(timeline);
+    this.destroyRef.onDestroy(() => this.resizeObserver?.disconnect());
   }
 
   private loadCalendar(): void {
@@ -284,7 +334,8 @@ export class HomeComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
         finalize(() => {
           this.calendarLoading = false;
-          if (!this.destroyRef.destroyed) this.changeDetectorRef.markForCheck();
+          // Apply the completed request to this OnPush view without waiting for an interaction.
+          if (!this.destroyRef.destroyed) this.changeDetectorRef.detectChanges();
         }),
       )
       .subscribe({
@@ -293,9 +344,14 @@ export class HomeComponent implements OnInit {
           this.calendarTasks = tasks;
           this.groups = groups;
         },
-        error: () => {
+        error: (error) => {
+          console.error('[CALENDRIER] erreur =', error);
+          console.error('[CALENDRIER] statut HTTP =', error.status);
+          console.error('[CALENDRIER] réponse =', error.error);
+
           this.groups = [];
           this.calendarError = true;
+          this.changeDetectorRef.markForCheck();
         },
       });
   }
@@ -430,52 +486,108 @@ export class HomeComponent implements OnInit {
       firstDate.localeCompare(secondDate),
     );
 
-    const result: TimelineGroup[] = [];
-    let displayedEvents = 0;
-
-    for (const dateKey of sortedDates) {
-      if (displayedEvents >= this.maxEvents || result.length >= this.maxDays) {
-        break;
-      }
-
+    const datedTasks = sortedDates.map((dateKey) => {
       const dateTasks = tasksByDate.get(dateKey) ?? [];
 
       /*
        * Dans chaque journée :
-       * priorité la plus forte, puis heure la plus proche.
+       * Heure de début croissante, puis priorité en cas d'égalité.
        */
       dateTasks.sort((firstTask, secondTask) => {
-        const priorityDifference =
-          this.getPriorityOrder(firstTask) - this.getPriorityOrder(secondTask);
-
-        if (priorityDifference !== 0) {
-          return priorityDifference;
-        }
-
-        return new Date(firstTask.dateDebut).getTime() - new Date(secondTask.dateDebut).getTime();
+        const timeDifference =
+          new Date(firstTask.dateDebut).getTime() - new Date(secondTask.dateDebut).getTime();
+        return (
+          timeDifference || this.getPriorityOrder(firstTask) - this.getPriorityOrder(secondTask)
+        );
       });
 
-      const remainingPlaces = this.maxEvents - displayedEvents;
+      return { dateTasks };
+    });
 
-      const selectedTasks = dateTasks.slice(0, remainingPlaces);
+    /* Sur mobile la page est naturellement scrollable : aucun élément n'est masqué. */
+    if (typeof window !== 'undefined' && window.innerWidth <= 1180) {
+      return datedTasks.map(({ dateTasks }) => {
+        const groupDate = new Date(dateTasks[0].dateDebut);
+        return {
+          key: this.buildGroupKey(groupDate),
+          label: this.buildGroupLabel(groupDate),
+          dateLabel: this.formatLongDate(groupDate),
+          events: dateTasks.map((task) => this.toTimelineEvent(task, typeLabels)),
+          hiddenCount: 0,
+        };
+      });
+    }
 
-      if (selectedTasks.length === 0) {
-        continue;
+    const availableHeight = this.timelineHeight || 560;
+    const totalTaskCount = datedTasks.reduce((total, group) => total + group.dateTasks.length, 0);
+    const selectedGroups: Array<{ dateTasks: TacheResponse[]; visibleCount: number }> = [];
+    let usedHeight = 0;
+
+    /* On réserve d'abord le titre et une première tâche pour chaque date affichable. */
+    for (const { dateTasks } of datedTasks) {
+      const minimumGroupHeight =
+        (selectedGroups.length > 0 ? this.groupGap : 0) +
+        this.dayHeaderHeight +
+        this.groupInnerGap +
+        this.taskRowHeight;
+
+      if (usedHeight + minimumGroupHeight > availableHeight) break;
+
+      selectedGroups.push({ dateTasks, visibleCount: 1 });
+      usedHeight += minimumGroupHeight;
+    }
+
+    /* Les places restantes sont attribuées aux tâches dans l'ordre chronologique. */
+    for (const group of selectedGroups) {
+      while (group.visibleCount < group.dateTasks.length) {
+        const nextTaskHeight = this.taskGap + this.taskRowHeight;
+        if (usedHeight + nextTaskHeight > availableHeight) break;
+        group.visibleCount++;
+        usedHeight += nextTaskHeight;
       }
+    }
 
+    let displayedCount = selectedGroups.reduce((total, group) => total + group.visibleCount, 0);
+    let hiddenCount = totalTaskCount - displayedCount;
+
+    /* Le compteur est une ligne compacte. On libère une tâche si nécessaire. */
+    if (hiddenCount > 0 && selectedGroups.length > 0) {
+      const counterHeight = this.taskGap + this.moreTasksHeight;
+      while (usedHeight + counterHeight > availableHeight) {
+        const removableGroup = [...selectedGroups]
+          .reverse()
+          .find((group) => group.visibleCount > 1);
+        if (removableGroup) {
+          removableGroup.visibleCount--;
+          displayedCount--;
+          hiddenCount++;
+          usedHeight -= this.taskGap + this.taskRowHeight;
+          continue;
+        }
+
+        if (selectedGroups.length <= 1) break;
+
+        const removedGroup = selectedGroups.pop();
+        if (!removedGroup) break;
+        displayedCount -= removedGroup.visibleCount;
+        hiddenCount += removedGroup.visibleCount;
+        usedHeight -=
+          this.groupGap + this.dayHeaderHeight + this.groupInnerGap + this.taskRowHeight;
+      }
+    }
+
+    const result: TimelineGroup[] = selectedGroups.map((group, index) => {
+      const selectedTasks = group.dateTasks.slice(0, group.visibleCount);
       const groupDate = new Date(selectedTasks[0].dateDebut);
 
-      const events = selectedTasks.map((tache) => this.toTimelineEvent(tache, typeLabels));
-
-      result.push({
+      return {
         key: this.buildGroupKey(groupDate),
         label: this.buildGroupLabel(groupDate),
         dateLabel: this.formatLongDate(groupDate),
-        events,
-      });
-
-      displayedEvents += events.length;
-    }
+        events: selectedTasks.map((tache) => this.toTimelineEvent(tache, typeLabels)),
+        hiddenCount: index === selectedGroups.length - 1 ? hiddenCount : 0,
+      };
+    });
 
     return result;
   }
