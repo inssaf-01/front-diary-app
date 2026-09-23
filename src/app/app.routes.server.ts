@@ -6,8 +6,10 @@ export const serverRoutes: ServerRoute[] = [
     path: 'home',
     renderMode: RenderMode.Client,
   },
+  { path: 'agenda', renderMode: RenderMode.Client },
+  { path: 'atelier', renderMode: RenderMode.Client },
   {
     path: '**',
-    renderMode: RenderMode.Prerender
-  }
+    renderMode: RenderMode.Prerender,
+  },
 ];

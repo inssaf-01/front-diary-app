@@ -1,0 +1,36 @@
+<header class="topbar">
+  <a class="brand" routerLink="/home" aria-label="Équilibre, accueil">
+    <span class="brand__moon"><i class="pi pi-sparkles"></i></span>
+    <span>Équilibre</span>
+  </a>
+
+  <app-main-nav />
+
+  <div class="topbar__actions">
+    <button
+      class="add-button"
+      type="button"
+      aria-label="Ajouter une tâche"
+      (click)="addClicked.emit()"
+    >
+      <i class="pi pi-plus"></i>
+      <span>Ajouter</span>
+      <i class="pi pi-angle-down"></i>
+    </button>
+    <span class="topbar__separator"></span>
+    <button class="profile" type="button" (click)="navigateToProfile()">
+      @if (avatarUrl) {
+        <img [src]="avatarUrl" [alt]="fullName" />
+      } @else {
+        <span class="profile__initial" aria-hidden="true">{{
+          fullName.slice(0, 1).toUpperCase()
+        }}</span>
+      }
+      <span class="profile__copy">
+        <strong>{{ firstName }}</strong>
+        <small>{{ status }}</small>
+      </span>
+      <i class="pi pi-angle-down"></i>
+    </button>
+  </div>
+</header>

@@ -6,30 +6,24 @@ import {
   HostListener,
   Input,
   Output,
+  OnChanges,
+  SimpleChanges,
   inject,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { TacheRequest, TacheResponse } from '../../home/home-calendar.service';
+
 export interface TaskParameterOption {
-  id: string;
+  id: number;
+  code: string;
   libelle: string;
   icon: string;
   color: string;
 }
 
-export interface CreateTaskPayload {
-  typeId: string;
-  titre: string;
-  description: string;
-  statutId: string;
-  prioriteId: string;
-  touteLaJournee: boolean;
-  dateDebut: string;
-  heureDebut: string | null;
-  dateFin: string;
-  heureFin: string | null;
-}
+export type CreateTaskPayload = TacheRequest;
 
 @Component({
   selector: 'app-ajout-tache',
@@ -39,7 +33,7 @@ export interface CreateTaskPayload {
   styleUrl: './ajout-tache.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AjoutTacheComponent {
+export class AjoutTacheComponent implements OnChanges {
   private readonly fb = inject(FormBuilder);
   private readonly host = inject(ElementRef<HTMLElement>);
 
@@ -47,27 +41,11 @@ export class AjoutTacheComponent {
   @Input() saving = false;
   @Input() saveError = '';
 
-  @Input() types: TaskParameterOption[] = [
-    { id: 'TACHE', libelle: 'Tâche', icon: 'pi pi-check-square', color: '#7193ff' },
-    { id: 'REUNION', libelle: 'Réunion', icon: 'pi pi-users', color: '#58c7ff' },
-    { id: 'EVENEMENT', libelle: 'Événement', icon: 'pi pi-calendar', color: '#8e72ff' },
-    { id: 'ANNIVERSAIRE', libelle: 'Anniversaire', icon: 'pi pi-gift', color: '#f36eae' },
-    { id: 'COURSES', libelle: 'Courses', icon: 'pi pi-shopping-cart', color: '#f4a261' },
-  ];
-
-  @Input() statuts: TaskParameterOption[] = [
-    { id: 'A_FAIRE', libelle: 'À faire', icon: 'pi pi-circle', color: '#7898c8' },
-    { id: 'EN_COURS', libelle: 'En cours', icon: 'pi pi-play-circle', color: '#7b79ff' },
-    { id: 'TERMINEE', libelle: 'Terminée', icon: 'pi pi-check-circle', color: '#66e6c2' },
-    { id: 'ANNULEE', libelle: 'Annulée', icon: 'pi pi-times-circle', color: '#d47d9d' },
-  ];
-
-  @Input() priorites: TaskParameterOption[] = [
-    { id: 'BASSE', libelle: 'Basse', icon: 'pi pi-arrow-down', color: '#7197c8' },
-    { id: 'NORMALE', libelle: 'Normale', icon: 'pi pi-minus', color: '#5f8dff' },
-    { id: 'HAUTE', libelle: 'Haute', icon: 'pi pi-arrow-up', color: '#f2a45f' },
-    { id: 'URGENTE', libelle: 'Urgente', icon: 'pi pi-bolt', color: '#f06f91' },
-  ];
+  @Input() types: TaskParameterOption[] = [];
+  @Input() statuts: TaskParameterOption[] = [];
+  @Input() priorites: TaskParameterOption[] = [];
+  @Input() task: TacheResponse | null = null;
+  @Input() initialDate: string | null = null;
 
   @Output() closed = new EventEmitter<void>();
   @Output() taskCreated = new EventEmitter<CreateTaskPayload>();
@@ -76,20 +54,96 @@ export class AjoutTacheComponent {
   mobileStep = 1;
 
   readonly form = this.fb.nonNullable.group({
-    typeId: ['EVENEMENT', Validators.required],
-    titre: ['Séance de sport', [Validators.required, Validators.maxLength(100)]],
-    description: [
-      'Salle de sport, renforcement musculaire et 30 min de cardio.',
-      Validators.maxLength(500),
-    ],
-    statutId: ['EN_COURS', Validators.required],
-    prioriteId: ['URGENTE', Validators.required],
+    typeId: this.fb.control<number | null>(null, Validators.required),
+    titre: ['', [Validators.required, Validators.maxLength(150)]],
+    description: ['', Validators.maxLength(3000)],
+    statutId: this.fb.control<number | null>(null, Validators.required),
+    prioriteId: this.fb.control<number | null>(null),
     touteLaJournee: [false],
     dateDebut: [this.today(), Validators.required],
     heureDebut: ['18:00'],
-    dateFin: [this.today(), Validators.required],
+    dateFin: [this.today()],
     heureFin: ['19:30'],
   });
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (
+      !this.visible ||
+      !(
+        changes['visible'] ||
+        changes['task'] ||
+        changes['types'] ||
+        changes['statuts'] ||
+        changes['priorites']
+      )
+    )
+      return;
+    const availableId = (options: TaskParameterOption[], id: number | null) =>
+      options.find((option) => option.id === id)?.id ?? null;
+    const resolve = (options: TaskParameterOption[], code: string | null) =>
+      options.find((option) => option.code === code)?.id ?? null;
+    // References can arrive after opening: keep the user's draft intact.
+    if (!changes['visible'] && !changes['task']) {
+      const controls = this.form.controls;
+      if (controls.typeId.value === null && controls.typeId.pristine) {
+        controls.typeId.setValue(
+          this.task
+            ? availableId(this.types, this.task.typeTacheId)
+            : (resolve(this.types, 'TACHE') ?? this.types[0]?.id ?? null),
+        );
+      }
+      if (controls.statutId.value === null && controls.statutId.pristine) {
+        controls.statutId.setValue(
+          this.task
+            ? availableId(this.statuts, this.task.statutId)
+            : (resolve(this.statuts, 'A_FAIRE') ?? this.statuts[0]?.id ?? null),
+        );
+      }
+      if (controls.prioriteId.value === null && controls.prioriteId.pristine) {
+        controls.prioriteId.setValue(
+          this.task
+            ? availableId(this.priorites, this.task.prioriteId)
+            : resolve(this.priorites, 'NORMALE'),
+        );
+        if (this.task?.prioriteId && controls.prioriteId.value === null) {
+          controls.prioriteId.setErrors({ unavailable: true });
+        }
+      }
+      return;
+    }
+    const localParts = (value: string | null) => {
+      if (!value) return { date: '', time: '' };
+      const date = new Date(value);
+      const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString();
+      return { date: local.slice(0, 10), time: local.slice(11, 16) };
+    };
+    const task = this.task;
+    const start = localParts(task?.dateDebut ?? null);
+    const end = localParts(task?.dateFin ?? null);
+    this.form.reset({
+      typeId: task
+        ? availableId(this.types, task.typeTacheId)
+        : (resolve(this.types, 'TACHE') ?? this.types[0]?.id ?? null),
+      statutId: task
+        ? availableId(this.statuts, task.statutId)
+        : (resolve(this.statuts, 'A_FAIRE') ?? this.statuts[0]?.id ?? null),
+      prioriteId: task
+        ? availableId(this.priorites, task.prioriteId)
+        : resolve(this.priorites, 'NORMALE'),
+      titre: task?.titre ?? '',
+      description: task?.details ?? '',
+      touteLaJournee: task?.touteLaJournee ?? false,
+      dateDebut: task ? start.date : (this.initialDate ?? this.today()),
+      heureDebut: task ? start.time : '09:00',
+      dateFin: task ? end.date : (this.initialDate ?? this.today()),
+      heureFin: task ? end.time : '10:00',
+    });
+    if (task?.prioriteId && this.form.controls.prioriteId.value === null) {
+      this.form.controls.prioriteId.setErrors({ unavailable: true });
+    }
+    this.mobileStep = 1;
+    this.openSelect = null;
+  }
 
   get selectedType(): TaskParameterOption | undefined {
     return this.types.find((item) => item.id === this.form.controls.typeId.value);
@@ -119,6 +173,7 @@ export class AjoutTacheComponent {
   ): void {
     event.stopPropagation();
     this.form.controls[control].setValue(option.id);
+    this.form.controls[control].markAsDirty();
     this.openSelect = null;
   }
 
@@ -133,16 +188,35 @@ export class AjoutTacheComponent {
   }
 
   submit(): void {
+    if (this.form.controls.dateFin.hasError('beforeStart')) {
+      this.form.controls.dateFin.setErrors(null);
+    }
     if (this.form.invalid || this.saving) {
       this.form.markAllAsTouched();
       return;
     }
 
     const value = this.form.getRawValue();
+    if (value.typeId === null || value.statutId === null) return;
+    const toInstant = (date: string, time: string) =>
+      new Date(
+        date + 'T' + (value.touteLaJournee ? '00:00' : time || '00:00') + ':00',
+      ).toISOString();
+    const dateDebut = toInstant(value.dateDebut, value.heureDebut);
+    const dateFin = value.dateFin ? toInstant(value.dateFin, value.heureFin) : null;
+    if (dateFin && dateFin < dateDebut) {
+      this.form.controls.dateFin.setErrors({ beforeStart: true });
+      return;
+    }
     this.taskCreated.emit({
-      ...value,
-      heureDebut: value.touteLaJournee ? null : value.heureDebut,
-      heureFin: value.touteLaJournee ? null : value.heureFin,
+      typeTacheId: value.typeId,
+      statutId: value.statutId,
+      prioriteId: value.prioriteId,
+      titre: value.titre,
+      details: value.description,
+      touteLaJournee: value.touteLaJournee,
+      dateDebut,
+      dateFin,
     });
   }
 

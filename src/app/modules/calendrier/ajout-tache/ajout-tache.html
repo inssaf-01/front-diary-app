@@ -21,7 +21,7 @@
         </div>
         <div>
           <span class="creator__eyebrow">Un moment pour vos projets</span>
-          <h2 id="task-dialog-title">Ajouter une tâche</h2>
+          <h2 id="task-dialog-title">{{ task ? 'Modifier une tâche' : 'Ajouter une tâche' }}</h2>
           <p>Un petit pas de plus vers vos grands objectifs.</p>
         </div>
         <button class="icon-button" type="button" aria-label="Fermer" (click)="close()">
@@ -30,6 +30,12 @@
       </header>
 
       <form [formGroup]="form" (ngSubmit)="submit()">
+        @if (!selectedType || !selectedStatut || form.controls.prioriteId.hasError('unavailable')) {
+          <p class="field-error" role="alert">
+            Sélectionnez un type, un statut et, si nécessaire, une priorité disponibles dans les
+            listes.
+          </p>
+        }
         <div class="steps">
           <article
             class="step-card step-card--what"
@@ -57,7 +63,13 @@
             <div class="step-card__content">
               <div class="field select-field">
                 <label>Type</label>
-                <button class="select-trigger" type="button" aria-label="Type de tâche" [attr.aria-expanded]="openSelect === 'type'" (click)="toggleSelect('type', $event)">
+                <button
+                  class="select-trigger"
+                  type="button"
+                  aria-label="Type de tâche"
+                  [attr.aria-expanded]="openSelect === 'type'"
+                  (click)="toggleSelect('type', $event)"
+                >
                   @if (selectedType; as option) {
                     <span class="option-icon" [style.--option-color]="option.color"
                       ><i [class]="option.icon"></i
@@ -94,7 +106,7 @@
                   id="task-title"
                   type="text"
                   formControlName="titre"
-                  maxlength="100"
+                  maxlength="150"
                   placeholder="Ex. : Préparer la présentation"
                 />
                 @if (form.controls.titre.touched && form.controls.titre.invalid) {
@@ -108,10 +120,10 @@
                   id="task-description"
                   formControlName="description"
                   rows="5"
-                  maxlength="500"
+                  maxlength="3000"
                   placeholder="Ajoutez des détails, un contexte ou des notes..."
                 ></textarea>
-                <span class="counter">{{ descriptionLength }}/500</span>
+                <span class="counter">{{ descriptionLength }}/3000</span>
               </div>
             </div>
           </article>
@@ -168,6 +180,9 @@
                 </div>
               }
               <div class="field">
+                @if (form.controls.dateFin.hasError('beforeStart')) {
+                  <small class="field-error">La fin doit être après le début.</small>
+                }
                 <label for="end-date">Date de fin</label>
                 <span class="input-with-icon"
                   ><i class="pi pi-calendar"></i
@@ -266,11 +281,24 @@
                     <span class="option-icon" [style.--option-color]="option.color"
                       ><i [class]="option.icon"></i></span
                     ><span>{{ option.libelle }}</span>
+                  } @else {
+                    <span>Sans priorité</span>
                   }
                   <i class="pi pi-chevron-down select-arrow"></i>
                 </button>
                 @if (openSelect === 'priorite') {
                   <div class="select-menu select-menu--priority">
+                    <button
+                      type="button"
+                      class="select-option"
+                      (click)="
+                        form.controls.prioriteId.setValue(null);
+                        form.controls.prioriteId.markAsDirty();
+                        openSelect = null
+                      "
+                    >
+                      Sans priorité
+                    </button>
                     @for (option of priorites; track option.id) {
                       <button
                         type="button"
@@ -301,14 +329,24 @@
           <p>« Les grandes réalisations commencent toujours par une simple tâche. »</p>
           <div class="footer-actions">
             <button class="button button--ghost" type="button" (click)="close()">Annuler</button>
-            <button class="button button--primary" type="submit" [disabled]="saving">
+            <button
+              class="button button--primary"
+              type="submit"
+              [disabled]="saving || !types.length || !statuts.length"
+            >
               <i
                 class="pi"
                 [class.pi-plus]="!saving"
                 [class.pi-spin]="saving"
                 [class.pi-spinner]="saving"
               ></i>
-              {{ saving ? 'Ajout en cours…' : 'Ajouter la tâche' }}
+              {{
+                saving
+                  ? 'Enregistrement…'
+                  : task
+                    ? 'Enregistrer les modifications'
+                    : 'Ajouter la tâche'
+              }}
             </button>
           </div>
         </footer>

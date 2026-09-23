@@ -15,41 +15,13 @@
     <div class="orbit orbit--two"></div>
   </div>
 
-  <header class="topbar">
-    <a class="brand" routerLink="/home" aria-label="Équilibre, accueil">
-      <span class="brand__moon"><i class="pi pi-sparkles"></i></span>
-      <span>Équilibre</span>
-    </a>
-
-    <nav class="main-nav" aria-label="Navigation principale">
-      @for (item of navigation; track item.route) {
-        <a
-          [routerLink]="item.route"
-          routerLinkActive="is-active"
-          [routerLinkActiveOptions]="{ exact: item.route === '/home' }"
-        >
-          <i class="pi" [class]="'pi ' + item.icon"></i><span>{{ item.label }}</span>
-        </a>
-      }
-    </nav>
-
-    <div class="topbar__actions">
-      <button class="add-button" type="button" (click)="openTaskDialog()">
-        <i class="pi pi-plus"></i>
-        <span>Ajouter</span>
-        <i class="pi pi-angle-down"></i>
-      </button>
-      <span class="topbar__separator"></span>
-      <button class="profile" type="button" (click)="navigate('/profile')">
-        <img [src]="user.avatarUrl" [alt]="user.fullName" />
-        <span class="profile__copy"
-          ><strong>{{ user.firstName }}</strong
-          ><small>{{ user.status }}</small></span
-        >
-        <i class="pi pi-angle-down"></i>
-      </button>
-    </div>
-  </header>
+  <app-main-topbar
+    [firstName]="user.firstName"
+    [fullName]="user.fullName"
+    [avatarUrl]="user.avatarUrl"
+    [status]="user.status"
+    (addClicked)="openTaskDialog()"
+  />
 
   <div class="page-shell">
     <aside class="inspiration" aria-label="Citation du jour">
@@ -212,7 +184,15 @@
                           }
                         </select>
                         <i class="pi pi-angle-right event-chevron"></i>
-                        <i class="pi pi-ellipsis-h event-more"></i>
+                        <button
+                          type="button"
+                          class="task-edit"
+                          [attr.aria-label]="'Modifier ' + event.title"
+                          [disabled]="savingTask || statusesSaving || pendingStatuses.size > 0"
+                          (click)="editTask(event)"
+                        >
+                          <i class="pi pi-pencil" aria-hidden="true"></i>
+                        </button>
                       </div>
                     </article>
                   }
@@ -303,6 +283,10 @@
 <app-ajout-tache
   [visible]="taskDialogVisible"
   [saving]="savingTask"
+  [types]="taskTypes"
+  [statuts]="taskStatuses"
+  [priorites]="taskPriorities"
+  [task]="editingTask"
   [saveError]="taskSaveError"
   (closed)="closeTaskDialog()"
   (taskCreated)="createTask($event)"

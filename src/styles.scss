@@ -16,3 +16,13 @@ app-root {
   padding: 0;
   background: transparent;
 }
+.home-page .task-edit {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0.5rem;
+  cursor: pointer;
+
+  &:disabled { opacity: 0.5; cursor: default; }
+  &:focus-visible { outline: 2px solid currentColor; border-radius: 0.4rem; }
+}

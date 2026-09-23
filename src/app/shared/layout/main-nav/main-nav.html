@@ -1,0 +1,11 @@
+<nav class="main-nav" aria-label="Navigation principale">
+  @for (item of navigation; track item.route) {
+    <a
+      [routerLink]="item.route"
+      routerLinkActive="is-active"
+      [routerLinkActiveOptions]="{ exact: item.route === '/home' }"
+    >
+      <i class="pi" [class]="'pi ' + item.icon"></i><span>{{ item.label }}</span>
+    </a>
+  }
+</nav>

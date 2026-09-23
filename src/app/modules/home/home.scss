@@ -1861,52 +1861,32 @@ a:focus-visible {
   }
 
   .timeline {
-    gap: 12px;
+    gap: clamp(12px, 2.7vh, 26px);
     min-height: 0;
   }
 
   .timeline .timeline-group {
-    flex: 0 0 auto;
+    flex: 0 1 calc(46px + var(--event-count) * 68px);
     min-height: 0;
   }
 
   .timeline .events {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     min-height: 0;
-    gap: 8px;
+    gap: clamp(5px, 0.85vh, 8px);
   }
 
-  .timeline .event-row,
-  .timeline-group:last-child .event-row {
-    height: 58px;
-    min-height: 58px;
-    flex: 0 0 58px;
+  .timeline .event-row {
+    flex: 1 1 0;
+    min-height: 0;
   }
 
   .timeline .event-card {
-    height: 54px;
-    min-height: 54px;
-    max-height: 54px;
-    padding-block: 7px;
+    min-height: 46px;
+    height: 100%;
+    max-height: 58px;
+    padding-block: 5px;
   }
-}
-
-.more-tasks {
-  align-self: flex-start;
-  height: 28px;
-  margin-left: 158px;
-  padding: 0 11px;
-  border: 1px solid rgba(121, 223, 204, 0.28);
-  border-radius: 8px;
-  color: #a9eadf;
-  font-size: 12px;
-  cursor: pointer;
-  background: rgba(121, 223, 204, 0.08);
-}
-
-.more-tasks i {
-  margin-right: 5px;
-  font-size: 10px;
 }
 
 @media (max-width: 1400px) and (min-width: 1181px) {

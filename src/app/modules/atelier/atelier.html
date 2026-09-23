@@ -1,0 +1,373 @@
+<div class="atelier-page">
+  <app-main-topbar
+    [firstName]="user.firstName"
+    [fullName]="user.fullName"
+    [avatarUrl]="user.avatarUrl"
+    [status]="user.status"
+    (addClicked)="openTaskDialog()"
+  />
+  <main class="workspace">
+    <header class="workspace__header">
+      <div class="workspace__title">
+        <span class="eyebrow">ATELIER CRÉATIF</span>
+        <input
+          type="text"
+          [value]="board.title"
+          aria-label="Nom du tableau"
+          (change)="renameBoard($event)"
+        />
+        <p>Écris, dessine, relie les idées. Cet espace est à toi.</p>
+      </div>
+      <div class="workspace__boards">
+        <label class="board-picker"
+          >Mes tableaux
+          <select [value]="activeBoardId" (change)="selectBoard($any($event.target).value)">
+            <option *ngFor="let item of boards; trackBy: trackById" [value]="item.id">
+              {{ item.title }}
+            </option>
+          </select>
+        </label>
+        <button
+          class="new-board"
+          type="button"
+          (click)="newBoard()"
+          title="Nouveau tableau"
+          aria-label="Nouveau tableau"
+        >
+          <i class="pi pi-plus" aria-hidden="true"></i><span>Nouveau tableau</span>
+        </button>
+        <span class="save-state" role="status"
+          ><i class="pi pi-check-circle" aria-hidden="true"></i>{{ saveMessage }}</span
+        >
+      </div>
+    </header>
+    <div class="toolbar" role="group" aria-label="Outils de dessin">
+      <div class="toolbar__tools">
+        <button
+          type="button"
+          [class.active]="tool === 'select'"
+          title="Sélectionner et déplacer"
+          (click)="selectTool('select')"
+        >
+          <i class="pi pi-arrow-up-left"></i><span>Sélection</span>
+        </button>
+
+        <button
+          type="button"
+          [class.active]="tool === 'pen'"
+          title="Dessiner au crayon"
+          (click)="selectTool('pen')"
+        >
+          <i class="pi pi-pencil"></i><span>Crayon</span>
+        </button>
+
+        <button
+          type="button"
+          [class.active]="tool === 'eraser'"
+          title="Effacer un élément"
+          (click)="selectTool('eraser')"
+        >
+          <i class="pi pi-eraser"></i><span>Gomme</span>
+        </button>
+
+        <button
+          type="button"
+          [class.active]="tool === 'text'"
+          title="Ajouter du texte libre"
+          (click)="selectTool('text')"
+        >
+          <i class="pi pi-align-left"></i><span>Texte</span>
+        </button>
+
+        <button
+          type="button"
+          [class.active]="tool === 'rectangle'"
+          title="Tracer un rectangle"
+          (click)="selectTool('rectangle')"
+        >
+          <i class="pi pi-stop"></i><span>Rectangle</span>
+        </button>
+
+        <button
+          type="button"
+          [class.active]="tool === 'square'"
+          title="Tracer un carré"
+          (click)="selectTool('square')"
+        >
+          <i class="pi pi-th-large"></i><span>Carré</span>
+        </button>
+
+        <button
+          type="button"
+          [class.active]="tool === 'circle'"
+          title="Tracer un cercle"
+          (click)="selectTool('circle')"
+        >
+          <i class="pi pi-circle"></i><span>Cercle</span>
+        </button>
+
+        <button
+          type="button"
+          [class.active]="tool === 'arrow'"
+          title="Tracer une flèche d'un point à un autre"
+          (click)="selectTool('arrow')"
+        >
+          <i class="pi pi-arrow-right"></i><span>Flèche</span>
+        </button>
+
+        <div class="toolbar__history">
+          <button
+            class="undo-button"
+            type="button"
+            aria-label="Annuler la dernière action"
+            title="Annuler la dernière action"
+            [disabled]="!canUndo"
+            (click)="undo()"
+          >
+            <i class="pi pi-undo"></i>
+            <span>Annuler</span>
+          </button>
+
+          <button
+            type="button"
+            aria-label="Rétablir"
+            title="Rétablir"
+            [disabled]="!canRedo"
+            (click)="redo()"
+          >
+            <i class="pi pi-refresh"></i>
+            <span>Rétablir</span>
+          </button>
+
+          <button
+            type="button"
+            aria-label="Supprimer l’élément sélectionné"
+            title="Supprimer l’élément sélectionné"
+            [disabled]="!selectedId"
+            (click)="deleteSelected()"
+          >
+            <i class="pi pi-trash"></i>
+            <span>Supprimer</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="toolbar__colors" aria-label="Couleurs">
+        <button
+          *ngFor="let option of palette"
+          class="swatch"
+          [class.swatch--active]="color === option"
+          [style.background]="option"
+          type="button"
+          [attr.aria-label]="'Couleur ' + option"
+          (click)="selectColor(option)"
+        ></button>
+
+        <label class="custom-color" title="Couleur personnalisée">
+          <i class="pi pi-palette"></i>
+          <input
+            type="color"
+            [value]="color"
+            aria-label="Choisir une couleur personnalisée"
+            (input)="selectColor($any($event.target).value)"
+          />
+        </label>
+      </div>
+
+      <button
+        class="fill-button"
+        type="button"
+        [class.fill-button--active]="filled"
+        [attr.aria-pressed]="filled"
+        title="Remplir ou vider la forme"
+        (click)="toggleFill()"
+      >
+        <i class="pi pi-box"></i>
+        <span>Remplir</span>
+      </button>
+
+      <div class="toolbar__zoom">
+        <button
+          type="button"
+          aria-label="Dézoomer"
+          [disabled]="zoom <= 0.5"
+          (click)="changeZoom(-0.1)"
+        >
+          −
+        </button>
+        <span>{{ zoom * 100 | number: '1.0-0' }} %</span>
+        <button
+          type="button"
+          aria-label="Zoomer"
+          [disabled]="zoom >= 1.5"
+          (click)="changeZoom(0.1)"
+        >
+          +
+        </button>
+      </div>
+    </div>
+    <div
+      #surfaceViewport
+      class="surface-scroll"
+      tabindex="0"
+      role="region"
+      aria-label="Espace de travail défilant"
+      aria-describedby="atelier-help"
+      (pointerdown)="onSurfacePointerDown($event)"
+    >
+      <div class="surface-size" [style.width.px]="width * zoom" [style.height.px]="height * zoom">
+        <svg
+          #drawingSurface
+          class="drawing-surface"
+          aria-label="Surface de dessin"
+          [class.drawing-surface--draw]="isDrawingTool"
+          [attr.viewBox]="'0 0 ' + width + ' ' + height"
+          (pointermove)="onPointerMove($event)"
+          (pointerup)="onPointerUp($event)"
+          (pointercancel)="onPointerUp($event)"
+        >
+          <g
+            *ngFor="let element of board.elements; trackBy: trackById"
+            class="drawing-object"
+            [class.drawing-object--selected]="selectedId === element.id"
+            (pointerdown)="onElementPointerDown($event, element)"
+          >
+            <!-- Crayon -->
+            <ng-container *ngIf="element.type === 'stroke'">
+              <path
+                [attr.d]="pathFor(element)"
+                fill="none"
+                [attr.stroke]="element.color"
+                stroke-width="4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              ></path>
+
+              <!-- Zone de prise plus large pour sélectionner ou effacer le trait. -->
+              <path
+                class="stroke-hit"
+                [attr.d]="pathFor(element)"
+                fill="none"
+                stroke="transparent"
+                stroke-width="24"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              ></path>
+            </ng-container>
+
+            <!-- Rectangle et carré -->
+            <rect
+              *ngIf="element.type === 'rectangle' || element.type === 'square'"
+              [attr.x]="element.x"
+              [attr.y]="element.y"
+              [attr.width]="element.width"
+              [attr.height]="element.height"
+              rx="16"
+              [attr.stroke]="element.color"
+              [attr.fill]="element.fill ? element.color : 'transparent'"
+              [attr.fill-opacity]="element.fill ? 0.22 : 0"
+              stroke-width="3"
+            ></rect>
+
+            <!-- Cercle -->
+            <ellipse
+              *ngIf="element.type === 'circle'"
+              [attr.cx]="element.x + element.width / 2"
+              [attr.cy]="element.y + element.height / 2"
+              [attr.rx]="element.width / 2"
+              [attr.ry]="element.height / 2"
+              [attr.stroke]="element.color"
+              [attr.fill]="element.fill ? element.color : 'transparent'"
+              [attr.fill-opacity]="element.fill ? 0.22 : 0"
+              stroke-width="3"
+            ></ellipse>
+
+            <!-- Flèche -->
+            <ng-container *ngIf="element.type === 'arrow'">
+              <line
+                [attr.x1]="element.x"
+                [attr.y1]="element.y"
+                [attr.x2]="element.x2"
+                [attr.y2]="element.y2"
+                [attr.stroke]="element.color"
+                stroke-width="4"
+                stroke-linecap="round"
+              ></line>
+
+              <polyline
+                [attr.points]="arrowHead(element)"
+                fill="none"
+                [attr.stroke]="element.color"
+                stroke-width="4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              ></polyline>
+
+              <line
+                class="arrow-hit"
+                [attr.x1]="element.x"
+                [attr.y1]="element.y"
+                [attr.x2]="element.x2"
+                [attr.y2]="element.y2"
+                stroke="transparent"
+                stroke-width="28"
+              ></line>
+            </ng-container>
+
+            <!-- Texte libre ou texte à l'intérieur d'une forme -->
+            <foreignObject
+              *ngIf="element.type === 'text' || isShape(element)"
+              [attr.x]="element.x + (element.type === 'text' ? 0 : 16)"
+              [attr.y]="element.y + (element.type === 'text' ? 0 : 16)"
+              [attr.width]="element.width - (element.type === 'text' ? 0 : 32)"
+              [attr.height]="element.height - (element.type === 'text' ? 0 : 32)"
+            >
+              <textarea
+                xmlns="http://www.w3.org/1999/xhtml"
+                [id]="'text-' + element.id"
+                class="element-text"
+                [class.element-text--free]="element.type === 'text'"
+                [class.element-text--circle]="element.type === 'circle'"
+                [style.color]="element.type === 'text' ? element.color : '#f5f3ff'"
+                [value]="element.text"
+                [placeholder]="element.type === 'text' ? 'Écris ici…' : 'Écris dans la forme…'"
+                [readOnly]="tool !== 'select'"
+                [attr.aria-label]="element.type === 'text' ? 'Texte libre' : 'Texte dans la forme'"
+                (focus)="onTextFocus(element)"
+                (input)="onTextInput(element, $event)"
+                (pointerdown)="$event.stopPropagation()"
+              ></textarea>
+            </foreignObject>
+
+            <!-- Poignée pour déplacer un texte ou une forme sans gêner l'écriture. -->
+            <circle
+              *ngIf="selectedId === element.id && (element.type === 'text' || isShape(element))"
+              class="move-handle"
+              [attr.cx]="element.x"
+              [attr.cy]="element.y"
+              r="13"
+              fill="#d5c3ff"
+              stroke="#233253"
+              stroke-width="3"
+            ></circle>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <p id="atelier-help" class="sr-only">
+      En mode Sélection, glissez sur le fond pour parcourir la surface. Choisissez un outil pour
+      dessiner. Utilisez les flèches du clavier lorsque la zone de travail a le focus pour la faire
+      défiler.
+    </p>
+  </main>
+</div>
+<app-ajout-tache
+  [visible]="taskDialogVisible"
+  [saving]="savingTask"
+  [saveError]="taskSaveError"
+  [types]="taskTypes"
+  [statuts]="taskStatuses"
+  [priorites]="taskPriorities"
+  (closed)="closeTaskDialog()"
+  (taskCreated)="createTask($event)"
+/>

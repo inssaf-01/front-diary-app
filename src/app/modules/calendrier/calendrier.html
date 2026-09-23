@@ -1,0 +1,310 @@
+﻿<main class="calendar-page">
+  <div class="stars" aria-hidden="true"></div>
+  <app-main-topbar
+    [firstName]="user.firstName"
+    [fullName]="user.fullName"
+    [avatarUrl]="user.avatarUrl"
+    [status]="user.status"
+    (addClicked)="openTaskDialog()"
+  />
+  <div class="calendar-shell">
+    <section class="page-heading">
+      <div>
+        <span class="eyebrow">Votre espace, à votre rythme</span>
+        <h1>Calendrier</h1>
+        <p>Vos tâches et rendez-vous, organisés par date.</p>
+      </div>
+      <div class="date-actions">
+        <label class="date-picker"
+          >Choisir une date
+          <input
+            type="date"
+            [ngModel]="cleDate(dateSelectionnee)"
+            (ngModelChange)="choisirDate($event)"
+          />
+        </label>
+        <button class="today-button" type="button" (click)="allerAujourdhui()">Aujourd’hui</button>
+        <button
+          class="today-button"
+          type="button"
+          [disabled]="loading"
+          (click)="refresh()"
+          aria-label="Actualiser le calendrier"
+        >
+          <i class="pi pi-refresh" [class.pi-spin]="loading" aria-hidden="true"></i>
+        </button>
+      </div>
+    </section>
+    @if (loading) {
+      <p class="calendar-message" role="status">Chargement des tâches de la période…</p>
+    }
+    @if (referencesLoading) {
+      <p class="calendar-message" role="status">Chargement des référentiels…</p>
+    }
+    @if (error || referenceError) {
+      <div class="calendar-message calendar-message--error" role="alert">
+        {{ error }} {{ referenceError }}
+        <button type="button" (click)="refresh()">Réessayer</button>
+      </div>
+    }
+    @if (actionError) {
+      <p class="calendar-message calendar-message--error" role="alert">{{ actionError }}</p>
+    }
+    <div class="calendar-layout" [attr.aria-busy]="loading">
+      <section class="panel month-panel" aria-label="Calendrier mensuel">
+        <div class="panel-heading">
+          <div>
+            <span class="panel-kicker">Vue mensuelle</span>
+            <h2>{{ moisAffiche | date: 'MMMM yyyy' : '' : 'fr' }}</h2>
+          </div>
+          <div class="icon-actions">
+            <button type="button" aria-label="Mois précédent" (click)="changerMois(-1)">
+              <i class="pi pi-chevron-left"></i>
+            </button>
+            <button type="button" aria-label="Mois suivant" (click)="changerMois(1)">
+              <i class="pi pi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="month-grid">
+          @for (nom of joursSemaine; track nom) {
+            <span class="weekday">{{ nom }}</span>
+          }
+          @for (jour of joursDuMois; track jour.cle) {
+            <button
+              class="day"
+              type="button"
+              [class.day--outside]="!jour.dansLeMois"
+              [class.day--selected]="estSelectionnee(jour.date)"
+              [class.day--today]="estAujourdhui(jour.date)"
+              [class.day--busy]="tachesPourDate(jour.cle).length >= 3"
+              [attr.aria-label]="
+                (jour.date | date: 'fullDate' : '' : 'fr') +
+                ', ' +
+                tachesPourDate(jour.cle).length +
+                ' tâches'
+              "
+              [attr.aria-pressed]="estSelectionnee(jour.date)"
+              (click)="selectionnerDate(jour.date)"
+            >
+              <span class="day__number">{{ jour.date.getDate() }}</span>
+              <span class="day__dots" aria-hidden="true">
+                @for (tache of tachesPourDate(jour.cle).slice(0, 3); track tache.id) {
+                  <i class="dot" [style.background]="tache.color"></i>
+                }
+              </span>
+            </button>
+          }
+        </div>
+        <div class="legend">
+          @for (type of types; track type.id) {
+            <span><i class="dot" [style.background]="type.color"></i>{{ type.libelle }}</span>
+          }
+        </div>
+      </section>
+      <section class="panel agenda-panel" aria-label="Agenda du jour">
+        <div class="panel-heading">
+          <div>
+            <span class="panel-kicker">Votre agenda</span>
+            <h2>{{ dateSelectionnee | date: 'EEEE d MMMM' : '' : 'fr' }}</h2>
+          </div>
+          <div class="icon-actions">
+            <button type="button" aria-label="Semaine précédente" (click)="changerSemaine(-1)">
+              <i class="pi pi-chevron-left"></i>
+            </button>
+            <button type="button" aria-label="Semaine suivante" (click)="changerSemaine(1)">
+              <i class="pi pi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="week-strip">
+          @for (date of semaineSelectionnee; track cleDate(date)) {
+            <button
+              type="button"
+              class="week-day"
+              [class.week-day--selected]="estSelectionnee(date)"
+              [attr.aria-pressed]="estSelectionnee(date)"
+              (click)="selectionnerDate(date)"
+            >
+              <span>{{ date | date: 'EEE' : '' : 'fr' }}</span
+              ><strong>{{ date.getDate() }}</strong>
+              <span class="week-day__dots" aria-hidden="true">
+                @for (tache of tachesPourDate(cleDate(date)).slice(0, 3); track tache.id) {
+                  <i class="dot" [style.background]="tache.color"></i>
+                }
+              </span>
+            </button>
+          }
+        </div>
+        @if (touteLaJournee.length) {
+          <div class="all-day">
+            <span>Toute la journée</span>
+            @for (tache of touteLaJournee; track tache.id) {
+              <button
+                type="button"
+                [style.border-color]="tache.color"
+                (click)="openTaskDialog(tache)"
+              >
+                {{ tache.titre }}
+              </button>
+            }
+          </div>
+        }
+        <div class="timeline-scroll">
+          <div class="timeline">
+            @for (heure of heures; track heure) {
+              <div class="time-row">
+                <time>{{ heure.toString().padStart(2, '0') }}:00</time><span></span>
+              </div>
+            }
+            <div class="timeline-events">
+              @for (event of evenementsHoraires; track event.task.id) {
+                <button
+                  type="button"
+                  class="event"
+                  [class.event--done]="event.task.statusCode === 'TERMINEE'"
+                  [style.--task-color]="event.task.color"
+                  [style.top.px]="event.top"
+                  [style.height.px]="event.height"
+                  [style.left.%]="event.left"
+                  [style.width.%]="event.width"
+                  [attr.aria-label]="event.task.titre + ', ' + horaire(event.task) + ', modifier'"
+                  [title]="event.task.titre + ' · ' + horaire(event.task)"
+                  (click)="openTaskDialog(event.task)"
+                >
+                  <strong>{{ event.task.titre }}</strong
+                  ><span>{{ horaire(event.task) }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="panel tasks-panel" aria-label="Tâches du jour">
+        <div class="panel-heading">
+          <div>
+            <span class="panel-kicker">À votre rythme</span>
+            <h2>Mes tâches du jour</h2>
+          </div>
+          <span class="task-count" [attr.aria-label]="nombreTachesDuJour + ' tâches au total'"
+            >{{ tachesDuJour.length }}/{{ nombreTachesDuJour }}</span
+          >
+        </div>
+        <label class="search-field"
+          >Rechercher
+          <input type="search" [(ngModel)]="recherche" placeholder="Titre ou description" />
+        </label>
+        <div class="filters">
+          <label
+            ><span>Statut</span
+            ><select [(ngModel)]="filtreStatut" aria-label="Filtrer par statut">
+              <option [ngValue]="null">Tous</option>
+              @for (statut of statuts; track statut.id) {
+                <option [ngValue]="statut.id">{{ statut.libelle }}</option>
+              }
+            </select></label
+          >
+          <label
+            ><span>Priorité</span
+            ><select [(ngModel)]="filtrePriorite" aria-label="Filtrer par priorité">
+              <option [ngValue]="null">Toutes</option>
+              @for (priorite of priorites; track priorite.id) {
+                <option [ngValue]="priorite.id">{{ priorite.libelle }}</option>
+              }
+            </select></label
+          >
+          <label
+            ><span>Type</span
+            ><select [(ngModel)]="filtreType" aria-label="Filtrer par type">
+              <option [ngValue]="null">Tous</option>
+              @for (type of types; track type.id) {
+                <option [ngValue]="type.id">{{ type.libelle }}</option>
+              }
+            </select></label
+          >
+        </div>
+        @if (filtreStatut !== null || filtrePriorite !== null || filtreType !== null || recherche) {
+          <button class="today-button reset-filters" type="button" (click)="resetFilters()">
+            <i class="pi pi-filter-slash" aria-hidden="true"></i>
+            Réinitialiser les filtres
+          </button>
+        }
+        <div class="task-list">
+          @for (tache of tachesDuJour; track tache.id) {
+            <article
+              class="task"
+              [class.task--done]="tache.statusCode === 'TERMINEE'"
+              [style.--task-color]="tache.color"
+            >
+              <span class="task__icon"><i class="pi pi-calendar"></i></span>
+              <div class="task__content">
+                <div class="task__top">
+                  <h3>{{ tache.titre }}</h3>
+                  <span class="type-badge">{{ tache.typeLabel }}</span>
+                </div>
+                <span class="task__time">{{ horaire(tache) }}</span>
+                <p>{{ tache.details }}</p>
+                <div class="task-controls">
+                  @if (tache.priorityLabel) {
+                    <span class="priority" [title]="tache.priorityLabel"><i class="pi pi-flag" aria-hidden="true"></i>{{ tache.priorityLabel }}</span>
+                  }
+                  <span class="task-status" [attr.data-status]="tache.statusCode"
+                    [class.task-status--busy]="savingStatuses.has(tache.id)"
+                    [title]="'Changer le statut : ' + tache.statusLabel">
+                    <i class="pi" [class.pi-spin]="savingStatuses.has(tache.id)"
+                      [class.pi-spinner]="savingStatuses.has(tache.id)"
+                      [class.pi-circle-fill]="!savingStatuses.has(tache.id)" aria-hidden="true"></i>
+                    <span class="task-status__label" aria-hidden="true">{{ tache.statusLabel }}</span>
+                    <i class="pi pi-angle-down" aria-hidden="true"></i>
+                    <select
+                    [value]="tache.statutId"
+                    (change)="selectStatus(tache, $event)"
+                    [disabled]="savingStatuses.has(tache.id) || !statuts.length"
+                    [attr.aria-label]="'Statut de ' + tache.titre"
+                  >
+                    @for (statut of statuts; track statut.id) {
+                      <option [value]="statut.id">{{ statut.libelle }}</option>
+                    }
+                    </select>
+                  </span>
+                  <button
+                    class="task-edit-button"
+                    type="button"
+                    (click)="openTaskDialog(tache)"
+                    [disabled]="savingStatuses.has(tache.id)"
+                    [attr.aria-label]="'Modifier ' + tache.titre"
+                    [title]="'Modifier ' + tache.titre"
+                  >
+                    <i class="pi pi-pencil" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </div>
+            </article>
+          } @empty {
+            @if (!loading && !error) {
+              <div class="empty-state">
+                <i class="pi pi-calendar"></i><strong>Aucune tâche pour cette sélection</strong>
+                <p>Choisissez une autre date, ajustez les filtres ou ajoutez une tâche.</p>
+                <button class="today-button" type="button" (click)="openTaskDialog()">
+                  Ajouter une tâche
+                </button>
+              </div>
+            }
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+<app-ajout-tache
+  [visible]="taskDialogVisible"
+  [saving]="savingTask"
+  [saveError]="taskSaveError || referenceError"
+  [types]="types"
+  [statuts]="statuts"
+  [priorites]="priorites"
+  [task]="editingTask"
+  [initialDate]="cleDate(dateSelectionnee)"
+  (closed)="closeTaskDialog()"
+  (taskCreated)="saveTask($event)"
+/>

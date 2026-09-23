@@ -11,18 +11,19 @@ import {
   PLATFORM_ID,
   ViewChild,
 } from '@angular/core';
-import { AjoutTacheComponent, CreateTaskPayload } from '../calendrier/ajout-tache/ajout-tache';
+import {
+  AjoutTacheComponent,
+  CreateTaskPayload,
+  TaskParameterOption,
+} from '../calendrier/ajout-tache/ajout-tache';
 
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MainTopbarComponent } from '../../shared/layout/main-topbar/main-topbar';
 
-import {
-  HomeCalendarService,
-  ParametreResponse,
-  TacheResponse,
-} from '../calendrier/home-calendar.service';
+import { HomeCalendarService, ParametreResponse, TacheResponse } from './home-calendar.service';
 
 import { AuthenticatedUser, LoginService } from '../test-connexion/login.service';
 import { defer, finalize, first, map } from 'rxjs';
@@ -110,7 +111,7 @@ const PRIORITY_ORDER: Record<string, number> = {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, AjoutTacheComponent],
+  imports: [CommonModule, MainTopbarComponent, AjoutTacheComponent],
   templateUrl: './home.html',
   styleUrl: './home.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -141,12 +142,44 @@ export class HomeComponent implements OnInit {
   statusMessage = '';
   statusSaveError = false;
 
-  readonly statusOptions = [
-    { code: 'A_FAIRE', label: 'À faire' },
-    { code: 'EN_COURS', label: 'En cours' },
-    { code: 'TERMINEE', label: 'Terminée' },
-    { code: 'ANNULEE', label: 'Annulée' },
-  ];
+  statusOptions: Array<{ id: number; code: string; label: string }> = [];
+  taskTypes: TaskParameterOption[] = [];
+  taskStatuses: TaskParameterOption[] = [];
+  taskPriorities: TaskParameterOption[] = [];
+  editingTask: TacheResponse | null = null;
+
+  private parameterOptions(
+    items: ParametreResponse[],
+    kind: 'type' | 'status' | 'priority',
+  ): TaskParameterOption[] {
+    // Presentation only: IDs and labels always come from the parameter API.
+    const appearance: Record<string, [string, string]> = {
+      TACHE: ['pi-check-square', '#7193ff'],
+      REUNION: ['pi-users', '#58c7ff'],
+      EVENEMENT: ['pi-calendar', '#8e72ff'],
+      ANNIVERSAIRE: ['pi-gift', '#f36eae'],
+      COURSES: ['pi-shopping-cart', '#f4a261'],
+      A_FAIRE: ['pi-circle', '#7898c8'],
+      EN_COURS: ['pi-play-circle', '#7b79ff'],
+      TERMINEE: ['pi-check-circle', '#66e6c2'],
+      ANNULEE: ['pi-times-circle', '#d47d9d'],
+      BASSE: ['pi-arrow-down', '#7197c8'],
+      NORMALE: ['pi-minus', '#5f8dff'],
+      HAUTE: ['pi-arrow-up', '#f2a45f'],
+      URGENTE: ['pi-bolt', '#f06f91'],
+    };
+    return items.map((item) => ({
+      ...item,
+      icon: appearance[item.code]
+        ? 'pi ' + appearance[item.code][0]
+        : kind === 'type'
+          ? 'pi ' + (TYPE_DISPLAY_CONFIG[item.code]?.icon ?? DEFAULT_DISPLAY_CONFIG.icon)
+          : kind === 'status'
+            ? 'pi pi-circle'
+            : 'pi pi-flag',
+      color: appearance[item.code]?.[1] ?? '#7193ff',
+    }));
+  }
 
   currentUser: AuthenticatedUser | null = null;
 
@@ -160,48 +193,38 @@ export class HomeComponent implements OnInit {
     status: 'Un jour plus aligné',
   };
 
-  readonly navigation = [
-    {
-      label: 'Accueil',
-      icon: 'pi-home',
-      route: '/home',
-    },
-    {
-      label: 'Agenda',
-      icon: 'pi-calendar',
-      route: '/agenda',
-    },
-    {
-      label: 'Tâches',
-      icon: 'pi-check-square',
-      route: '/tasks',
-    },
-    {
-      label: 'Projets',
-      icon: 'pi-bullseye',
-      route: '/projects',
-    },
-    {
-      label: 'Finances',
-      icon: 'pi-chart-bar',
-      route: '/finances',
-    },
-    {
-      label: 'Listes',
-      icon: 'pi-list',
-      route: '/lists',
-    },
-    {
-      label: 'Notes',
-      icon: 'pi-file',
-      route: '/notes',
-    },
-  ];
   taskDialogVisible = false;
   savingTask = false;
   taskSaveError = '';
 
   openTaskDialog(): void {
+    this.editingTask = null;
+    this.taskSaveError = '';
+    this.taskDialogVisible = true;
+    if (!this.taskTypes.length || !this.taskStatuses.length) {
+      this.calendarService
+        .loadParameters()
+        .pipe(first(), takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: ({ typesTache, statuts, priorites }) => {
+            this.taskTypes = this.parameterOptions(typesTache, 'type');
+            this.taskStatuses = this.parameterOptions(statuts, 'status');
+            this.taskPriorities = this.parameterOptions(priorites, 'priority');
+            this.changeDetectorRef.detectChanges();
+          },
+          error: () => {
+            this.taskSaveError =
+              'Impossible de charger les listes du formulaire. Fermez puis rouvrez le formulaire pour réessayer.';
+            this.changeDetectorRef.detectChanges();
+          },
+        });
+    }
+  }
+
+  editTask(event: TimelineEvent): void {
+    if (this.savingTask || this.statusesSaving || this.pendingStatuses.size) return;
+    this.editingTask = this.calendarTasks.find((task) => task.id === event.id) ?? null;
+    if (!this.editingTask) return;
     this.taskSaveError = '';
     this.taskDialogVisible = true;
   }
@@ -216,7 +239,11 @@ export class HomeComponent implements OnInit {
     this.savingTask = true;
     this.taskSaveError = '';
     this.changeDetectorRef.markForCheck();
-    defer(() => this.calendarService.createTask(task))
+    defer(() =>
+      this.editingTask
+        ? this.calendarService.updateTask(this.editingTask.id, task)
+        : this.calendarService.createTask(task),
+    )
       .pipe(
         first(),
         takeUntilDestroyed(this.destroyRef),
@@ -324,7 +351,15 @@ export class HomeComponent implements OnInit {
     defer(() => this.calendarService.loadCalendar(dateDebut, dateFin))
       .pipe(
         first(),
-        map(({ typesTache, taches }) => {
+        map(({ typesTache, statuts, priorites, taches }) => {
+          this.taskTypes = this.parameterOptions(typesTache, 'type');
+          this.taskStatuses = this.parameterOptions(statuts, 'status');
+          this.taskPriorities = this.parameterOptions(priorites, 'priority');
+          this.statusOptions = statuts.map((item) => ({
+            id: item.id,
+            code: item.code,
+            label: item.libelle,
+          }));
           const tasks = taches.filter((tache) => {
             const start = new Date(tache.dateDebut).getTime();
             return start >= dateDebut.getTime() && start < dateFin.getTime();
@@ -359,7 +394,9 @@ export class HomeComponent implements OnInit {
   toggleTaskStatus(event: TimelineEvent): void {
     if (this.statusesSaving) return;
 
-    const originalStatus = this.calendarTasks.find((task) => task.id === event.id)?.statut.code;
+    const originalStatus = this.statusCodeFor(
+      this.calendarTasks.find((task) => task.id === event.id),
+    );
     if (!originalStatus) return;
     this.setPendingStatus(event, this.pendingStatuses.has(event.id) ? originalStatus : 'TERMINEE');
   }
@@ -376,7 +413,7 @@ export class HomeComponent implements OnInit {
 
     const savedTask = this.calendarTasks.find((task) => task.id === event.id);
     if (!savedTask) return;
-    const originalStatus = savedTask.statut.code.toUpperCase();
+    const originalStatus = this.statusCodeFor(savedTask) ?? '';
     const newStatus = statusCode.trim().toUpperCase();
     if (!this.statusOptions.some((status) => status.code === newStatus)) return;
 
@@ -411,7 +448,15 @@ export class HomeComponent implements OnInit {
     this.statusMessage = '';
     this.statusSaveError = false;
     this.changeDetectorRef.markForCheck();
-    defer(() => this.calendarService.updateStatuses(modifications))
+    defer(() =>
+      this.calendarService.updateStatuses(
+        modifications.map((change) => {
+          const status = this.statusOptions.find((item) => item.code === change.statutCode);
+          if (!status) throw new Error('Statut indisponible');
+          return { tacheId: change.tacheId, statutId: status.id };
+        }),
+      ),
+    )
       .pipe(
         first(),
         map((updatedTasks) => {
@@ -423,7 +468,7 @@ export class HomeComponent implements OnInit {
           if (
             updatedById.size !== modifications.length ||
             modifications.some(
-              (change) => updatedById.get(change.tacheId)?.statut?.code !== change.statutCode,
+              (change) => this.statusCodeFor(updatedById.get(change.tacheId)) !== change.statutCode,
             )
           ) {
             throw new Error('Incomplete status update response');
@@ -460,7 +505,7 @@ export class HomeComponent implements OnInit {
     const typeLabels = new Map<number, string>(typesTache.map((type) => [type.id, type.libelle]));
 
     const visibleTasks = taches.filter((tache) => {
-      const statusCode = tache.statut?.code?.toUpperCase();
+      const statusCode = this.statusCodeFor(tache);
 
       return statusCode === 'A_FAIRE' || statusCode === 'EN_COURS';
     });
@@ -593,16 +638,16 @@ export class HomeComponent implements OnInit {
   }
 
   private toTimelineEvent(tache: TacheResponse, typeLabels: Map<number, string>): TimelineEvent {
-    const typeCode = tache.typeTache?.code?.toUpperCase() ?? 'TACHE';
+    const typeCode = this.taskTypes.find((item) => item.id === tache.typeTacheId)?.code ?? 'TACHE';
 
     const displayConfig = TYPE_DISPLAY_CONFIG[typeCode] ?? DEFAULT_DISPLAY_CONFIG;
 
-    const typeLabel = typeLabels.get(tache.typeTache.id) ?? tache.typeTache.libelle;
+    const typeLabel = typeLabels.get(tache.typeTacheId) ?? 'Type indisponible';
 
     return {
       id: tache.id,
 
-      statusCode: tache.statut?.code?.toUpperCase() ?? 'A_FAIRE',
+      statusCode: this.statusCodeFor(tache) ?? 'A_FAIRE',
 
       time: tache.touteLaJournee ? 'Toute la journée' : this.formatTime(tache.dateDebut),
 
@@ -616,12 +661,16 @@ export class HomeComponent implements OnInit {
 
       duration: this.calculateDuration(tache.dateDebut, tache.dateFin, tache.touteLaJournee),
 
-      badge: tache.priorite?.libelle ?? undefined,
+      badge: this.taskPriorities.find((item) => item.id === tache.prioriteId)?.libelle,
     };
   }
 
+  private statusCodeFor(task: TacheResponse | undefined): string | undefined {
+    return this.statusOptions.find((item) => item.id === task?.statutId)?.code;
+  }
+
   private getPriorityOrder(tache: TacheResponse): number {
-    const priorityCode = tache.priorite?.code?.toUpperCase();
+    const priorityCode = this.taskPriorities.find((item) => item.id === tache.prioriteId)?.code;
 
     if (!priorityCode) {
       return 5;
