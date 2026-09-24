@@ -45,6 +45,7 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
 
   afterEach(() => requests.verify());
 
+  function page(tasks: TacheResponse[]) { return {content: tasks, totalElements: tasks.length}; }
   function flushParameters() {
     for (const request of requests.match((req) => req.url.endsWith('/parametres'))) {
       expect(request.request.params.has('categorie')).toBe(false);
@@ -73,7 +74,7 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
     const home = TestBed.runInInjectionContext(() => new HomeComponent());
     home.ngOnInit();
     flushParameters();
-    requests.expectOne((req) => req.url.endsWith('/taches/calendrier')).flush([task()]);
+    requests.expectOne((req) => req.url.endsWith('/taches/accueil')).flush(page([task()]));
     expect(home.calendarLoading).toBe(false);
     expect(home.groups[0].events[0].id).toBe('task-1');
   });
@@ -82,7 +83,7 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
     const fixture = TestBed.createComponent(HomeComponent);
     fixture.detectChanges();
     flushParameters();
-    requests.expectOne((req) => req.url.endsWith('/taches/calendrier')).flush(tasks);
+    requests.expectOne((req) => req.url.endsWith('/taches/accueil')).flush(page(tasks));
     await fixture.whenStable();
     expect(fixture.componentInstance.calendarLoading).toBe(false);
     return fixture;
@@ -107,7 +108,7 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
     expect(title.value).toBe('Draft before parameters');
     expect(fixture.nativeElement.querySelector('.button--primary').disabled).toBe(false);
     requests
-      .expectOne((req) => req.url.endsWith('/calendrier'))
+      .expectOne((req) => req.url.endsWith('/accueil'))
       .flush(null, { status: 500, statusText: 'Error' });
     await fixture.whenStable();
     fixture.nativeElement.querySelector('.button--primary').click();
@@ -118,7 +119,7 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
       statutId: 19,
     });
     post.flush(task());
-    requests.expectOne((req) => req.url.endsWith('/calendrier')).flush([task()]);
+    requests.expectOne((req) => req.url.endsWith('/accueil')).flush(page([task()]));
     await fixture.whenStable();
     expect(fixture.nativeElement.querySelector('.task-overlay')).toBeNull();
   });
@@ -128,7 +129,7 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
     fixture.detectChanges();
     flushParameters();
     requests
-      .expectOne((req) => req.url.endsWith('/calendrier'))
+      .expectOne((req) => req.url.endsWith('/accueil'))
       .flush(null, { status: 500, statusText: 'Error' });
     await fixture.whenStable();
     fixture.nativeElement.querySelector('.add-button').click();
@@ -159,8 +160,8 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
     expect(put.request.url).toBe(`${API_CONFIG.baseUrl}/taches/task-1`);
     put.flush({ ...task('EN_COURS'), titre: 'Modified' });
     requests
-      .expectOne((req) => req.url.endsWith('/calendrier'))
-      .flush([{ ...task('EN_COURS'), titre: 'Modified' }]);
+      .expectOne((req) => req.url.endsWith('/accueil'))
+      .flush(page([{ ...task('EN_COURS'), titre: 'Modified' }]));
     await fixture.whenStable();
     expect(fixture.componentInstance.taskDialogVisible).toBe(false);
     expect(fixture.nativeElement.textContent).toContain('Modified');
@@ -174,9 +175,9 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
       await fixture.whenStable();
       expect(fixture.nativeElement.textContent).toContain('Chargement de vos tâches');
       flushParameters();
-      const calendar = requests.expectOne((req) => req.url.endsWith('/taches/calendrier'));
+      const calendar = requests.expectOne((req) => req.url.endsWith('/taches/accueil'));
       if (outcome === 'error') calendar.flush(null, { status: 500, statusText: 'Error' });
-      else calendar.flush(outcome === 'empty' ? [] : [task()]);
+      else calendar.flush(page(outcome === 'empty' ? [] : [task()]));
 
       // Inspect the DOM directly: no click, detectChanges, or scheduled render after the response.
       expect(fixture.nativeElement.textContent).not.toContain('Chargement de vos tâches');
@@ -226,8 +227,8 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
         post.flush(task('EN_COURS'));
         flushParameters();
         requests
-          .expectOne((req) => req.url.endsWith('/taches/calendrier'))
-          .flush([task('EN_COURS')]);
+          .expectOne((req) => req.url.endsWith('/taches/accueil'))
+          .flush(page([task('EN_COURS')]));
       } else {
         post.flush(null, { status: 500, statusText: 'Error' });
       }
@@ -332,6 +333,7 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
     expect(fixture.componentInstance.groups.length).toBe(1);
     fixture.componentInstance.confirmStatusChanges();
     requests.expectOne((req) => req.method === 'PATCH').flush([task('TERMINEE')]);
+    requests.expectOne(req => req.url.endsWith('/accueil')).flush(page([]));
     await fixture.whenStable();
     expect(fixture.componentInstance.statusesSaving).toBe(false);
     expect(fixture.componentInstance.pendingStatuses.size).toBe(0);
@@ -406,7 +408,7 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
     fixture.detectChanges();
     flushParameters();
     requests
-      .expectOne((req) => req.url.endsWith('/taches/calendrier'))
+      .expectOne((req) => req.url.endsWith('/taches/accueil'))
       .flush(null, { status: 500, statusText: 'Error' });
     await fixture.whenStable();
     expect(fixture.componentInstance.calendarLoading).toBe(false);
@@ -425,7 +427,7 @@ describe('Home loading and status lifecycle (OnPush / zoneless)', () => {
         { provide: LoginService, useValue: { getCurrentUser: vi.fn() } },
       ],
     });
-    const load = vi.spyOn(TestBed.inject(HomeCalendarService), 'loadCalendar');
+    const load = vi.spyOn(TestBed.inject(HomeCalendarService), 'loadHome');
     TestBed.runInInjectionContext(() => new HomeComponent().ngOnInit());
     expect(load).not.toHaveBeenCalled();
     expect(TestBed.inject(LoginService).getCurrentUser).not.toHaveBeenCalled();

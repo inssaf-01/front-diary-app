@@ -58,6 +58,11 @@
           [class.timeline--many-days]="groups.length > 3"
           aria-label="Agenda à venir"
         >
+          <div class="task-list-controls">
+            <strong>Mes tâches</strong>
+            <label><input type="checkbox" [checked]="includeOverdue" [disabled]="calendarLoading || statusesSaving" (change)="toggleOverdue()" /> Inclure les tâches en retard</label>
+
+          </div>
           @if (pendingStatuses.size > 0) {
             <div class="status-actions" [attr.aria-busy]="statusesSaving">
               <button
@@ -89,124 +94,158 @@
           >
             {{ statusMessage }}
           </p>
-          @if (calendarLoading) {
-            <p class="timeline-state" role="status">Chargement de vos tâches...</p>
-          } @else if (calendarError) {
-            <p class="timeline-state timeline-state--error" role="alert">
-              Impossible de charger vos tâches. Vérifiez que le serveur est démarré.
-            </p>
-          } @else if (groups.length === 0) {
-            <p class="timeline-state" role="status">
-              Aucune tâche à afficher pour les prochains jours.
-            </p>
-          } @else {
-            @for (group of groups; track group.key) {
-              <section
-                class="timeline-group"
-                [class.timeline-group--today]="group.key === 'today'"
-                [style.--event-count]="group.events.length"
-              >
-                <header class="group-heading">
-                  <span class="heading-dot"></span>
-                  <h2>{{ group.label }}</h2>
-                  <p>{{ group.dateLabel }}</p>
-                </header>
+          <div class="timeline-list">
+            @if (calendarLoading) {
+              <p class="timeline-state" role="status">Chargement de vos tâches...</p>
+            } @else if (calendarError) {
+              <p class="timeline-state timeline-state--error" role="alert">
+                Impossible de charger vos tâches. Vérifiez que le serveur est démarré.
+              </p>
+            } @else if (groups.length === 0) {
+              <p class="timeline-state" role="status">Aucune tâche à afficher avec ce filtre.</p>
+            } @else {
+              @for (group of groups; track group.key) {
+                <section
+                  class="timeline-group"
+                  [class.timeline-group--today]="group.key === 'today'"
+                  [style.--event-count]="group.events.length"
+                >
+                  <header class="group-heading">
+                    <span class="heading-dot"></span>
+                    <h2>{{ group.label }}</h2>
+                    <p>{{ group.dateLabel }}</p>
+                  </header>
 
-                <div class="events">
-                  @for (event of group.events; track event.id) {
-                    <article
-                      class="event-row"
-                      [class.event-row--pending]="pendingStatuses.has(event.id)"
-                      [class.event-row--completed]="pendingStatuses.get(event.id) === 'TERMINEE'"
-                    >
-                      <time>{{ event.time }}</time>
-                      <button
-                        class="event-node"
-                        type="button"
-                        [attr.data-tone]="event.tone"
-                        [disabled]="statusesSaving"
-                        [attr.aria-pressed]="pendingStatuses.has(event.id)"
-                        [attr.aria-label]="
-                          (pendingStatuses.has(event.id)
-                            ? 'Annuler la modification de '
-                            : 'Marquer comme terminée : ') + event.title
-                        "
-                        (click)="toggleTaskStatus(event)"
+                  <div class="events">
+                    @for (event of group.events; track event.id) {
+                      <article
+                        class="event-row"
+                        [class.event-row--pending]="pendingStatuses.has(event.id)"
+                        [class.event-row--completed]="pendingStatuses.get(event.id) === 'TERMINEE'"
                       >
-                        <i
-                          [class]="
-                            pendingStatuses.has(event.id) ? 'pi pi-check' : 'pi ' + event.icon
-                          "
-                          aria-hidden="true"
-                        ></i>
-                      </button>
-                      <div class="event-card">
-                        <span class="event-icon" [attr.data-tone]="event.tone"
-                          ><i class="pi" [class]="'pi ' + event.icon"></i
-                        ></span>
-                        <span class="event-copy">
-                          <strong>{{ event.title }}</strong>
-                          <small>
-                            @if (pendingStatuses.has(event.id)) {
-                              <span class="pending-label">À confirmer · </span>
-                            }
-                            {{ event.subtitle }}</small
-                          >
-                        </span>
-                        <span class="event-meta">
-                          @if (event.team) {
-                            <small><i class="pi pi-users"></i>{{ event.team }}</small>
-                          }
-                          @if (event.duration) {
-                            <small><i class="pi pi-clock"></i>{{ event.duration }}</small>
-                          }
-                          @if (event.badge) {
-                            <em>{{ event.badge }}</em>
-                          }
-                        </span>
-                        <select
-                          class="status-select"
-                          [value]="pendingStatuses.get(event.id) ?? event.statusCode"
-                          [disabled]="statusesSaving"
-                          [attr.aria-label]="'Statut de ' + event.title"
-                          (click)="$event.stopPropagation()"
-                          (change)="changeTaskStatus(event, $event)"
-                        >
-                          @for (status of statusOptions; track status.code) {
-                            <option
-                              [value]="status.code"
-                              [selected]="
-                                status.code === (pendingStatuses.get(event.id) ?? event.statusCode)
-                              "
-                            >
-                              {{ status.label }}
-                            </option>
-                          }
-                        </select>
-                        <i class="pi pi-angle-right event-chevron"></i>
+                        <time>{{ event.time }}</time>
                         <button
+                          class="event-node"
                           type="button"
-                          class="task-edit"
-                          [attr.aria-label]="'Modifier ' + event.title"
-                          [disabled]="savingTask || statusesSaving || pendingStatuses.size > 0"
-                          (click)="editTask(event)"
+                          [attr.data-tone]="event.tone"
+                          [disabled]="statusesSaving"
+                          [attr.aria-pressed]="pendingStatuses.has(event.id)"
+                          [attr.aria-label]="
+                            (pendingStatuses.has(event.id)
+                              ? 'Annuler la modification de '
+                              : 'Marquer comme terminée : ') + event.title
+                          "
+                          (click)="toggleTaskStatus(event)"
                         >
-                          <i class="pi pi-pencil" aria-hidden="true"></i>
+                          <i
+                            [class]="
+                              pendingStatuses.has(event.id) ? 'pi pi-check' : 'pi ' + event.icon
+                            "
+                            aria-hidden="true"
+                          ></i>
                         </button>
-                      </div>
-                    </article>
-                  }
-                  @if (group.hiddenCount > 0) {
-                    <button class="more-tasks" type="button" (click)="navigate('/tasks')">
-                      <i class="pi pi-plus" aria-hidden="true"></i>
-                      {{ group.hiddenCount }} autre{{ group.hiddenCount > 1 ? 's' : '' }} tâche{{
-                        group.hiddenCount > 1 ? 's' : ''
-                      }}
-                    </button>
-                  }
-                </div>
-              </section>
+                        <div class="event-card">
+                          <span class="event-icon" [attr.data-tone]="event.tone"
+                            ><i class="pi" [class]="'pi ' + event.icon"></i
+                          ></span>
+                          <span class="event-copy">
+                            <strong>{{ event.title }}</strong>
+                            <small>
+                              @if (pendingStatuses.has(event.id)) {
+                                <span class="pending-label">À confirmer · </span>
+                              }
+                              @if (event.overdue) {
+                                <span class="pending-label">En retard · </span>
+                              }
+                              {{ event.subtitle }}</small
+                            >
+                          </span>
+                          <span class="event-meta">
+                            @if (event.team) {
+                              <small><i class="pi pi-users"></i>{{ event.team }}</small>
+                            }
+                            @if (event.duration) {
+                              <small><i class="pi pi-clock"></i>{{ event.duration }}</small>
+                            }
+                            @if (event.badge) {
+                              <em>{{ event.badge }}</em>
+                            }
+                          </span>
+                          <select
+                            class="status-select"
+                            [value]="pendingStatuses.get(event.id) ?? event.statusCode"
+                            [disabled]="statusesSaving"
+                            [attr.aria-label]="'Statut de ' + event.title"
+                            (click)="$event.stopPropagation()"
+                            (change)="changeTaskStatus(event, $event)"
+                          >
+                            @for (status of statusOptions; track status.code) {
+                              <option
+                                [value]="status.code"
+                                [selected]="
+                                  status.code ===
+                                  (pendingStatuses.get(event.id) ?? event.statusCode)
+                                "
+                              >
+                                {{ status.label }}
+                              </option>
+                            }
+                          </select>
+                          <i class="pi pi-angle-right event-chevron"></i>
+                          <button
+                            type="button"
+                            class="task-edit"
+                            [attr.aria-label]="'Modifier ' + event.title"
+                            [disabled]="savingTask || statusesSaving || pendingStatuses.size > 0"
+                            (click)="editTask(event)"
+                          >
+                            <i class="pi pi-pencil" aria-hidden="true"></i>
+                          </button>
+                        </div>
+                      </article>
+                    }
+
+                  </div>
+                </section>
+              }
             }
+          </div>
+          @if (!calendarError && totalTasks > 0) {
+            <nav class="task-list-controls task-pagination" aria-label="Pagination des tâches">
+              <span role="status" aria-live="polite"
+                >Page {{ currentPage }} / {{ totalPages }} · {{ totalTasks }} tâches</span
+              >
+              <div class="page-buttons">
+                <button
+                  type="button"
+                  [disabled]="calendarLoading || statusesSaving || currentPage === 1"
+                  (click)="changePage(currentPage - 1)"
+                  aria-label="Page précédente"
+                >
+                  Précédent
+                </button>
+                @for (page of pageNumbers; track page) {
+                  <button
+                    type="button"
+                    [disabled]="calendarLoading || statusesSaving" [class.is-active]="page === currentPage"
+                    [attr.aria-current]="page === currentPage ? 'page' : null"
+                    [attr.aria-label]="'Page ' + page"
+                    (click)="changePage(page)"
+                  >
+                    {{ page }}
+                  </button>
+                }
+                <button
+                  type="button"
+                  [disabled]="calendarLoading || statusesSaving || currentPage === totalPages"
+                  (click)="changePage(currentPage + 1)"
+                  aria-label="Page suivante"
+                >
+                  Suivant
+                </button>
+              </div>
+              @if (currentPage < totalPages) { <small class="next-page-hint">D’autres tâches vous attendent sur la page suivante</small> }
+            </nav>
           }
         </section>
 

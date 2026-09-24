@@ -41,6 +41,15 @@ export class HomeCalendarService {
   private readonly http = inject(HttpClient);
   private readonly parameters = inject(TaskParametersService);
 
+  loadHome(dateDebut: Date, dateFin: Date, inclureRetard: boolean, page = 0, size = 3): Observable<HomeCalendarData & {totalElements: number}> {
+    return forkJoin({
+      parameters: this.parameters.load(),
+      taches: this.http.get<{content: TacheResponse[]; totalElements: number}>(API_CONFIG.baseUrl + '/taches/accueil', {
+        params: new HttpParams().set('dateDebut', dateDebut.toISOString()).set('dateFin', dateFin.toISOString()).set('inclureRetard', inclureRetard).set('page', page).set('size', size),
+      }),
+    }).pipe(map(({ parameters, taches }) => ({ ...parameters, taches: taches.content, totalElements: taches.totalElements })));
+  }
+
   loadParameters(): Observable<TaskParameters> {
     return this.parameters.load();
   }
