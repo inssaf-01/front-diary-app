@@ -1,0 +1,315 @@
+<main class="courses-page">
+  <div class="ambient" aria-hidden="true"></div>
+  <app-main-topbar
+    [firstName]="user.firstName"
+    [fullName]="user.fullName"
+    [avatarUrl]="user.avatarUrl"
+    [status]="user.status"
+    (addClicked)="openTaskDialog()"
+  />
+
+  <div class="content">
+    <header class="page-heading">
+      <div>
+        <span class="eyebrow"><i class="pi pi-sparkles"></i> MON QUOTIDIEN</span>
+        <h1>Courses <span>&</span> Alimentation</h1>
+        <p>Votre stock, vos repas et ce qu’il reste à acheter au même endroit.</p>
+      </div>
+      <button class="primary-btn" type="button" (click)="addProduct()">
+        <i class="pi pi-plus"></i> Ajouter un produit
+      </button>
+    </header>
+
+    @if (isLoading()) {
+      <p role="status">Chargement des aliments…</p>
+    }
+    @if (loadError()) {
+      <p role="alert">
+        {{ loadError() }} <button type="button" (click)="retryLoading()">Réessayer</button>
+      </p>
+    }
+    <div class="workspace">
+      <section class="home-zone" aria-labelledby="home-title">
+        <div class="section-title">
+          <div>
+            <span class="eyebrow">01 / CHEZ MOI</span>
+            <h2 id="home-title">Ce que j’ai & ce que je prépare</h2>
+          </div>
+          <span class="count">{{ stock().length }} produits affichés</span>
+        </div>
+        <div class="stock-toolbar">
+          <label class="search"
+            ><i class="pi pi-search"></i
+            ><input
+              type="search"
+              placeholder="Rechercher un aliment"
+              aria-label="Rechercher un aliment"
+              [ngModel]="search()"
+              (ngModelChange)="search.set($event)"
+          /></label>
+          <div
+            class="filters"
+            aria-label="Filtrer selon le macronutriment dominant en grammes"
+            title="Macronutriment dominant en grammes ; les valeurs inconnues sont exclues du filtre."
+          >
+            <button
+              type="button"
+              [class.active]="selectedCategory() === null"
+              (click)="setCategory(null)"
+            >
+              Tous
+            </button>
+            @for (category of categories; track category) {
+              <button
+                type="button"
+                [class.active]="selectedCategory() === category"
+                (click)="setCategory(category)"
+              >
+                {{ category }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="stock-and-meal">
+          <section class="panel inventory" aria-label="Produits disponibles">
+            <div class="panel-heading">
+              <h3><i class="pi pi-home"></i> Dans mon placard</h3>
+              <small>Plusieurs apports possibles par aliment</small>
+            </div>
+            <div
+              class="food-list panel-scroll"
+              tabindex="0"
+              role="region"
+              aria-label="Aliments du placard"
+            >
+              @for (item of stock(); track item.id) {
+                <article class="food-row">
+                  <span class="food-icon" aria-hidden="true">{{ item.icon || '📦' }}</span>
+                  <div class="food-info">
+                    <strong>{{ item.name }}</strong
+                    ><small>{{ item.description }}</small>
+                    <div class="tags">
+                      @for (tag of item.categories; track tag) {
+                        <span>{{ tag }}</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="food-meta">
+                    <label class="quantity-label"
+                      >Quantité
+                      <span class="quantity"
+                        ><input
+                          type="number"
+                          min="0"
+                          [attr.aria-label]="'Quantité de ' + item.name"
+                          [ngModel]="item.quantity"
+                          (ngModelChange)="updateQuantity(item.id, +$event)"
+                        /><span>{{ item.unit }}</span></span
+                      ></label
+                    >
+                    @if (item.kcal !== undefined) {
+                      <small
+                        >{{ item.kcal }} kcal /
+                        {{ item.unit === 'unité(s)' ? 'unité' : '100 ' + item.unit }}</small
+                      >
+                    }
+                  </div>
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    [class.selected]="portion(item.id) > 0"
+                    [attr.aria-label]="
+                      portion(item.id)
+                        ? 'Retirer ' + item.name + ' du repas'
+                        : 'Ajouter ' + item.name + ' au repas'
+                    "
+                    (click)="toggleFood(item)"
+                  >
+                    <i [class]="portion(item.id) ? 'pi pi-check' : 'pi pi-plus'"></i>
+                  </button>
+                </article>
+              } @empty {
+                <p class="empty">
+                  Aucun produit trouvé. Effacez les filtres ou ajoutez un aliment.
+                </p>
+              }
+            </div>
+          </section>
+
+          <section class="panel meal" aria-labelledby="meal-title">
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">ATELIER REPAS</span>
+                <h3 id="meal-title">Composer mon assiette</h3>
+              </div>
+              <span class="meal-art" aria-hidden="true">🍽️</span>
+            </div>
+            <div
+              class="meal-scroll panel-scroll"
+              tabindex="0"
+              role="region"
+              aria-label="Composition et nutrition de mon assiette"
+            >
+              <p class="hint">
+                Choisissez des ingrédients dans votre stock ou une suggestion ci-dessous.
+              </p>
+              <div class="meal-ingredients">
+                @for (ingredient of portions(); track ingredient.foodId) {
+                  @if (food(ingredient.foodId); as item) {
+                    <div class="ingredient">
+                      <span class="ingredient-name"
+                        ><span class="ingredient-icon" aria-hidden="true">{{ item.icon }}</span
+                        >{{ item.name }}</span
+                      ><label
+                        ><input
+                          type="number"
+                          min="0"
+                          [attr.aria-label]="'Portion de ' + item.name"
+                          [ngModel]="ingredient.quantity"
+                          (ngModelChange)="setPortion(item.id, +$event)"
+                        />
+                        {{ item.unit }}</label
+                      ><button
+                        type="button"
+                        [attr.aria-label]="'Retirer ' + item.name"
+                        (click)="setPortion(item.id, 0)"
+                      >
+                        <i class="pi pi-times"></i>
+                      </button>
+                    </div>
+                  }
+                } @empty {
+                  <p class="empty">Votre assiette attend ses premiers ingrédients.</p>
+                }
+              </div>
+              <div class="nutrition">
+                <div>
+                  <strong>{{ round(totals().kcal) }}</strong
+                  ><span>kcal estimées</span>
+                </div>
+                <div>
+                  <strong>{{ round(totals().protein) }} g</strong><span>Protéines</span>
+                </div>
+                <div>
+                  <strong>{{ round(totals().carbs) }} g</strong><span>Glucides</span>
+                </div>
+                <div>
+                  <strong>{{ round(totals().fat) }} g</strong><span>Lipides</span>
+                </div>
+              </div>
+              <small class="disclaimer"
+                >Estimation selon les quantités saisies et les valeurs moyennes des aliments.</small
+              >
+              @if (missing().length) {
+                <div class="missing">
+                  <strong><i class="pi pi-shopping-bag"></i> Il manque</strong>
+                  @for (entry of missing(); track entry.food.id) {
+                    <span>{{ entry.food.name }} · {{ entry.quantity }} {{ entry.food.unit }}</span>
+                  }
+                  <button class="secondary-btn" type="button" (click)="addMissingToShopping()">
+                    Ajouter les manquants aux courses <i class="pi pi-arrow-right"></i>
+                  </button>
+                </div>
+              }
+            </div>
+          </section>
+        </div>
+
+        <section class="suggestions" aria-label="Suggestions de repas">
+          <div class="suggestions-heading">
+            <div>
+              <span class="eyebrow">INSPIRATION</span>
+              <h3>Des idées avec votre stock</h3>
+            </div>
+            <small>Sélectionnez une idée pour voir ce qu’il manque</small>
+          </div>
+          <div class="recipe-grid">
+            @for (recipe of recipes(); track recipe.name) {
+              <button
+                class="recipe"
+                type="button"
+                [class.chosen]="selectedRecipe()?.name === recipe.name"
+                (click)="chooseRecipe(recipe)"
+              >
+                <span class="recipe-icon">{{ recipe.icon || '🍲' }}</span>
+                <strong>{{ recipe.name }}</strong>
+                <small>{{ recipe.description }}</small>
+                <span class="recipe-action">
+                  Composer ce repas <i class="pi pi-arrow-right"></i>
+                </span>
+              </button>
+            }
+          </div>
+        </section>
+      </section>
+
+      <aside class="shopping-zone panel" aria-labelledby="shopping-title">
+        <div class="shopping-heading">
+          <span class="eyebrow">02 / MES COURSES</span>
+          <h2 id="shopping-title">
+            À acheter <span>{{ shopping().length }}</span>
+          </h2>
+          <p>Complétez votre liste, puis rangez les produits achetés dans votre stock.</p>
+        </div>
+        <div
+          class="shopping-list panel-scroll"
+          tabindex="0"
+          role="region"
+          aria-label="Aliments à acheter"
+        >
+          @for (item of shopping(); track item.id) {
+            <article class="shopping-row">
+                <span class="food-icon" aria-hidden="true">{{ item.icon || '📦' }}</span>
+              <div class="shopping-info">
+                <strong>{{ item.name }}</strong
+                ><small>{{ item.description }}</small>
+                <div class="tags">
+                  @for (tag of item.categories; track tag) {
+                    <span>{{ tag }}</span>
+                  }
+                </div>
+                @if (item.kcal !== undefined) {
+                  <small
+                    >{{ item.kcal }} kcal /
+                    {{ item.unit === 'unité(s)' ? 'unité' : '100 ' + item.unit }}</small
+                  >
+                }
+              </div>
+              <label class="quantity-label"
+                >Qté
+                <span class="quantity"
+                  ><input
+                    type="number"
+                    min="0"
+                    [attr.aria-label]="'Quantité à acheter de ' + item.name"
+                    [ngModel]="item.quantity"
+                    (ngModelChange)="updateQuantity(item.id, +$event, 'courses')"
+                  /><span>{{ item.unit }}</span></span
+                ></label
+              ><button
+                class="done-btn"
+                type="button"
+                [attr.aria-label]="'Marquer ' + item.name + ' disponible'"
+                (click)="moveToStock(item.id)"
+              >
+                <i class="pi pi-check"></i><span>Disponible</span>
+              </button>
+            </article>
+          } @empty {
+            <p class="empty">Votre liste est vide. Ajoutez un produit ou composez un repas.</p>
+          }
+        </div>
+        <button class="add-shopping" type="button" (click)="addProduct()">
+          <i class="pi pi-plus"></i> Ajouter aux courses
+        </button>
+      </aside>
+    </div>
+  </div>
+</main>
+<app-courses-modal
+  [visible]="modalOuverte"
+  [aliments]="alimentsPourModal()"
+  [repas]="repasPourModal()"
+  (ferme)="modalOuverte = false"
+/>

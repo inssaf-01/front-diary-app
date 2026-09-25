@@ -1,0 +1,98 @@
+@if (visible) {
+  <div class="modal-backdrop" (click)="fermer()">
+    <section class="courses-modal" role="dialog" aria-modal="true" aria-labelledby="courses-title" (click)="$event.stopPropagation()">
+      <header class="modal-header">
+        <div><span class="eyebrow"><i class="pi pi-sparkles"></i> Équilibre</span><h2 id="courses-title">Courses & Alimentation</h2><p>Gérez vos aliments, composez vos repas et suivez votre stock.</p></div>
+        <button class="icon-button" type="button" aria-label="Fermer" (click)="fermer()"><i class="pi pi-times"></i></button>
+      </header>
+
+      <nav class="action-nav" aria-label="Action à effectuer">
+        <button type="button" [class.active]="action === 'aliment'" [attr.aria-current]="action === 'aliment' ? 'page' : null" (click)="choisirAction('aliment')"><i class="pi pi-apple"></i><span>Ajouter un aliment</span></button>
+        <button type="button" [class.active]="action === 'repas'" [attr.aria-current]="action === 'repas' ? 'page' : null" (click)="choisirAction('repas')"><i class="pi pi-book"></i><span>Créer un repas</span></button>
+        <button type="button" [class.active]="action === 'ajout-repas'" [attr.aria-current]="action === 'ajout-repas' ? 'page' : null" (click)="choisirAction('ajout-repas')"><i class="pi pi-plus"></i><span>Ajouter au repas</span></button>
+        <button type="button" [class.active]="action === 'stock'" [attr.aria-current]="action === 'stock' ? 'page' : null" (click)="choisirAction('stock')"><i class="pi pi-box"></i><span>Modifier le stock</span></button>
+      </nav>
+
+      <div class="modal-content">
+        @if (erreur) { <p class="feedback error" role="alert"><i class="pi pi-exclamation-circle"></i>{{ erreur }}</p> }
+        @if (succes) { <p class="feedback success" role="status"><i class="pi pi-check-circle"></i>{{ succes }}</p> }
+
+        @switch (action) {
+          @case ('aliment') {
+            <div class="form-layout"><div class="form-panel">
+              <h3>Nouvel aliment</h3>
+              <label>Nom de l’aliment <input [(ngModel)]="aliment.nom" placeholder="Ex. Flocons d’avoine" autocomplete="off" /></label>
+              <label>Description <small>(facultatif)</small><textarea [(ngModel)]="aliment.description" rows="2" placeholder="Quelques précisions…"></textarea></label>
+              <div class="field-grid three">
+                <label>Unité <input [(ngModel)]="aliment.unite" placeholder="g, ml, pièce…" /></label>
+                <label>Quantité en stock <input type="number" min="0" step="any" [(ngModel)]="aliment.quantiteStock" /></label>
+                <label>Quantité à acheter <input type="number" min="0" step="any" [(ngModel)]="aliment.quantiteAAcheter" /></label>
+              </div>
+              <button class="section-toggle" type="button" [attr.aria-expanded]="nutritionOuverte" (click)="nutritionOuverte = !nutritionOuverte"><span><i class="pi pi-chart-bar"></i> Nutrition <small>(facultative)</small></span><i [class]="nutritionOuverte ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"></i></button>
+              @if (nutritionOuverte) {
+                <div class="nutrition-fields">
+                  <label class="switch"><input type="checkbox" [(ngModel)]="nutritionActive" /> Renseigner les informations nutritionnelles</label>
+                  @if (nutritionActive) {
+                    <label>Base nutritionnelle <select [(ngModel)]="aliment.baseNutritionnelle"><option [ngValue]="null">Choisir une base</option><option value="POUR_100_G">Pour 100 g</option><option value="PAR_UNITE">Par unité</option></select></label>
+                    <div class="field-grid nutrition-grid">
+                      <label>Calories (kcal) <input type="number" min="0" step="any" [(ngModel)]="aliment.calories" /></label>
+                      <label>Protéines (g) <input type="number" min="0" step="any" [(ngModel)]="aliment.proteinesG" /></label>
+                      <label>Glucides (g) <input type="number" min="0" step="any" [(ngModel)]="aliment.glucidesG" /></label>
+                      <label>Lipides (g) <input type="number" min="0" step="any" [(ngModel)]="aliment.lipidesG" /></label>
+                      <label>Fibres (g) <input type="number" min="0" step="any" [(ngModel)]="aliment.fibresG" /></label>
+                    </div>
+                    <p class="hint">Pour un calcul automatique, utilisez « pour 100 g » avec l’unité g ou « par unité » avec l’unité pièce.</p>
+                  }
+                </div>
+              }
+            </div></div>
+            <footer class="modal-footer"><button class="secondary" type="button" (click)="fermer()">Annuler</button><button class="primary" type="button" [disabled]="enregistrement" (click)="validerAliment()"><i class="pi pi-check"></i> {{ enregistrement ? 'Enregistrement…' : 'Enregistrer l’aliment' }}</button></footer>
+          }
+          @case ('repas') {
+            <div class="form-layout meal-layout"><div class="form-panel">
+              <h3>Composer un repas</h3>
+              <label>Nom du repas <input [(ngModel)]="repasForm.nom" placeholder="Ex. Déjeuner équilibré" /></label>
+              <label>Description <small>(facultatif)</small><textarea [(ngModel)]="repasForm.description" rows="2" placeholder="Décrivez votre repas…"></textarea></label>
+              <label>Type de repas <small>(facultatif)</small><input [(ngModel)]="repasForm.typeRepas" placeholder="Ex. Déjeuner" /></label>
+              <div class="divider"></div><h4>Ajouter des aliments existants</h4>
+              <label class="search-label">Rechercher un aliment <span class="search-field"><i class="pi pi-search"></i><input [(ngModel)]="recherche" placeholder="Nom de l’aliment…" /></span></label>
+              <div class="results" aria-label="Aliments trouvés">
+                @for (a of resultats; track a.id) {
+                  <button type="button" class="result-row" [disabled]="dansComposition(a.id)" (click)="ajouterIngredient(a)"><span><strong>{{ a.nom }}</strong><small>{{ a.unite }} · {{ a.baseNutritionnelle === 'POUR_100_G' ? 'nutrition pour 100 g' : a.baseNutritionnelle === 'PAR_UNITE' ? 'nutrition par unité' : 'nutrition indisponible' }}</small></span><i [class]="dansComposition(a.id) ? 'pi pi-check' : 'pi pi-plus-circle'"></i></button>
+                } @empty { <p class="empty">Aucun aliment trouvé.</p> }
+              </div>
+              <h4>Composition <span class="count">{{ composition.length }}</span></h4>
+              @for (i of composition; track i.alimentId) {
+                <div class="ingredient-row"><strong>{{ alimentParId(i.alimentId)?.nom }}</strong><label><span class="sr-only">Quantité de {{ alimentParId(i.alimentId)?.nom }}</span><input type="number" min="0.01" step="any" [ngModel]="i.quantite" (ngModelChange)="modifierQuantiteIngredient(i.alimentId, $event)" /></label><span>{{ alimentParId(i.alimentId)?.unite }}</span><button type="button" aria-label="Retirer cet aliment" (click)="retirerIngredient(i.alimentId)"><i class="pi pi-trash"></i></button></div>
+              } @empty { <p class="empty">Ajoutez au moins un aliment pour composer ce repas.</p> }
+            </div>
+            <aside class="summary-panel"><span class="eyebrow"><i class="pi pi-sparkles"></i> Aperçu du repas</span><h3>{{ repasForm.nom || 'Votre repas' }}</h3><p>{{ composition.length }} aliment(s) sélectionné(s)</p><div class="divider"></div>
+              <div class="metric"><span>Calories</span><strong>{{ total('calories') === null ? '—' : (total('calories') | number:'1.0-1') + ' kcal' }}</strong></div>
+              <div class="metric"><span>Protéines</span><strong>{{ total('proteinesG') === null ? '—' : (total('proteinesG') | number:'1.0-1') + ' g' }}</strong></div>
+              <div class="metric"><span>Glucides</span><strong>{{ total('glucidesG') === null ? '—' : (total('glucidesG') | number:'1.0-1') + ' g' }}</strong></div>
+              <div class="metric"><span>Lipides</span><strong>{{ total('lipidesG') === null ? '—' : (total('lipidesG') | number:'1.0-1') + ' g' }}</strong></div>
+              <div class="metric"><span>Fibres</span><strong>{{ total('fibresG') === null ? '—' : (total('fibresG') | number:'1.0-1') + ' g' }}</strong></div>
+              <p class="hint"><i class="pi pi-info-circle"></i> Estimation selon les données disponibles. « — » signifie qu’une valeur ou une conversion manque.</p>
+            </aside></div>
+            <footer class="modal-footer"><button class="secondary" type="button" (click)="fermer()">Annuler</button><button class="primary" type="button" [disabled]="enregistrement" (click)="validerRepas()"><i class="pi pi-check"></i> {{ enregistrement ? 'Création…' : 'Créer le repas' }}</button></footer>
+          }
+          @case ('ajout-repas') {
+            <div class="simple-form"><h3>Ajouter un aliment à un repas</h3><p class="intro">Sélectionnez un repas et un aliment existants.</p>
+              <label>Repas <select [(ngModel)]="repasId" (ngModelChange)="erreur = ''"><option value="">Choisir un repas</option>@for (r of repas; track r.id) { <option [value]="r.id">{{ r.nom }}</option> }</select></label>
+              <label>Aliment <select [(ngModel)]="alimentId" (ngModelChange)="erreur = ''"><option value="">Choisir un aliment</option>@for (a of aliments; track a.id) { <option [value]="a.id">{{ a.nom }}</option> }</select></label>
+              @if (dejaPresent) { <p class="feedback warning" role="status"><i class="pi pi-info-circle"></i>Cet aliment est déjà dans ce repas. Modifiez sa quantité dans le repas.</p> }
+              @if (alimentSelectionne) { <label>Quantité ({{ alimentSelectionne.unite }}) <input type="number" min="0.01" step="any" [(ngModel)]="quantite" /></label> }
+            </div><footer class="modal-footer"><button class="secondary" type="button" (click)="fermer()">Annuler</button><button class="primary" type="button" [disabled]="enregistrement || dejaPresent" (click)="validerAjout()"><i class="pi pi-plus"></i> Ajouter au repas</button></footer>
+          }
+          @case ('stock') {
+            <div class="simple-form"><h3>Modifier le stock</h3><p class="intro">Mettez à jour séparément ce que vous possédez et ce que vous souhaitez acheter.</p>
+              <label>Aliment <select [ngModel]="stockAlimentId" (ngModelChange)="selectionnerStock($event)"><option value="">Rechercher ou choisir un aliment</option>@for (a of aliments; track a.id) { <option [value]="a.id">{{ a.nom }}</option> }</select></label>
+              @if (stockSelectionne) { <div class="stock-current"><span>Unité : <strong>{{ stockSelectionne.unite }}</strong></span><span>En stock actuellement : <strong>{{ stockSelectionne.quantiteStock }}</strong></span><span>À acheter actuellement : <strong>{{ stockSelectionne.quantiteAAcheter }}</strong></span></div>
+                <div class="field-grid"><label>Nouvelle quantité en stock <input type="number" min="0" step="any" [(ngModel)]="stockActuel" /><small>Ce que vous avez déjà.</small></label><label>Nouvelle quantité à acheter <input type="number" min="0" step="any" [(ngModel)]="achatActuel" /><small>Ce qui manque sur votre liste.</small></label></div> }
+            </div><footer class="modal-footer"><button class="secondary" type="button" (click)="fermer()">Annuler</button><button class="primary" type="button" [disabled]="enregistrement || !stockSelectionne" (click)="validerStock()"><i class="pi pi-check"></i> Enregistrer les quantités</button></footer>
+          }
+        }
+      </div>
+    </section>
+  </div>
+}

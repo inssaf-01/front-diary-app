@@ -26,6 +26,14 @@ export const routes: Routes = [
       import('./modules/atelier/atelier').then((component) => component.AtelierComponent),
   },
   {
+    path: 'courses',
+    loadComponent: () =>
+      import('./modules/courses/courses-alimentation').then(
+        (component) => component.CoursesAlimentationComponent,
+      ),
+  },
+
+  {
     path: '**',
     redirectTo: 'login',
   },

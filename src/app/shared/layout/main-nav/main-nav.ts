@@ -27,7 +27,8 @@ export class MainNavComponent {
     { label: 'Tâches', icon: 'pi-check-square', route: '/tasks' },
     { label: 'Projets', icon: 'pi-bullseye', route: '/projects' },
     { label: 'Finances', icon: 'pi-chart-bar', route: '/finances' },
-    { label: 'Listes', icon: 'pi-list', route: '/lists' },
+    { label: 'courses', icon: 'pi-shopping-bag', route: '/courses' },
+
     { label: 'Notes', icon: 'pi-file', route: '/notes' },
   ];
 }

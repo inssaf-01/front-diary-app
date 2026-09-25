@@ -60,8 +60,15 @@
         >
           <div class="task-list-controls">
             <strong>Mes tâches</strong>
-            <label><input type="checkbox" [checked]="includeOverdue" [disabled]="calendarLoading || statusesSaving" (change)="toggleOverdue()" /> Inclure les tâches en retard</label>
-
+            <label
+              ><input
+                type="checkbox"
+                [checked]="includeOverdue"
+                [disabled]="calendarLoading || statusesSaving"
+                (change)="toggleOverdue()"
+              />
+              Inclure les tâches en retard</label
+            >
           </div>
           @if (pendingStatuses.size > 0) {
             <div class="status-actions" [attr.aria-busy]="statusesSaving">
@@ -102,7 +109,9 @@
                 Impossible de charger vos tâches. Vérifiez que le serveur est démarré.
               </p>
             } @else if (groups.length === 0) {
-              <p class="timeline-state" role="status">Aucune tâche à afficher avec ce filtre.</p>
+              <p class="timeline-state" role="status">
+                Aucune tâche prévue pour aujourd’hui ou les prochains jours.
+              </p>
             } @else {
               @for (group of groups; track group.key) {
                 <section
@@ -204,7 +213,6 @@
                         </div>
                       </article>
                     }
-
                   </div>
                 </section>
               }
@@ -227,7 +235,8 @@
                 @for (page of pageNumbers; track page) {
                   <button
                     type="button"
-                    [disabled]="calendarLoading || statusesSaving" [class.is-active]="page === currentPage"
+                    [disabled]="calendarLoading || statusesSaving"
+                    [class.is-active]="page === currentPage"
                     [attr.aria-current]="page === currentPage ? 'page' : null"
                     [attr.aria-label]="'Page ' + page"
                     (click)="changePage(page)"
@@ -244,7 +253,11 @@
                   Suivant
                 </button>
               </div>
-              @if (currentPage < totalPages) { <small class="next-page-hint">D’autres tâches vous attendent sur la page suivante</small> }
+              @if (currentPage < totalPages) {
+                <small class="next-page-hint"
+                  >D’autres tâches vous attendent sur la page suivante</small
+                >
+              }
             </nav>
           }
         </section>
